@@ -130,6 +130,31 @@ void mqtt_app_hb_stop(void);
  * @brief Start MQTT heartbeat task (if enabled in config).
  */
 void mqtt_app_hb_start(void);
+
+/**
+ * @brief Get current heartbeat enabled state.
+ *
+ * @return true if heartbeat is enabled; false otherwise.
+ */
+bool mqtt_app_is_hb_enabled(void);
+
+/**
+ * @brief Set heartbeat default-on flag (persist to NVS).
+ *
+ * This controls the heartbeat state after reboot. If your configuration does not
+ * provide a heartbeat topic, enabling heartbeat will have no visible effect.
+ *
+ * @param enable true: default on; false: default off
+ * @return ESP_OK on success; otherwise error code.
+ */
+esp_err_t mqtt_app_set_hb_default(bool enable);
+
+/**
+ * @brief Get heartbeat default-on flag.
+ *
+ * @return true if default is on; false if default is off.
+ */
+bool mqtt_app_get_hb_default(void);
 esp_err_t mqtt_app_load_subscriptions_from_nvs(void);
 esp_err_t mqtt_app_save_subscriptions_to_nvs(void);
 esp_err_t mqtt_app_clear_subscriptions_nvs(void);

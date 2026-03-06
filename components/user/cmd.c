@@ -16,6 +16,7 @@
 #include "wifi.h"
 #include "wifi_service.h"
 #include "mqtt_app.h"
+#include "weather.h"
 // 你已有的时间函数（如果你有 time_sync.h 就 include；没有就保持 extern）
 extern bool time_is_valid(void);
 extern void print_time_now(void);
@@ -118,6 +119,7 @@ void print_help(void)
         "connssid <ssid> <psw>      - connect by ssid and password (async)\r\n"
         "info                       - show current wifi info\r\n"
         "time                       - show time\r\n"
+        "weather                    - location by WiFi IP + current weather\r\n"
         "disconn                    - manual disconnect (async)\r\n"
         "reconn                     - reconnect using saved STA cfg (flash)\r\n"
         "forget                     - erase last saved wifi (NVS) and disconnect\r\n"
@@ -130,8 +132,11 @@ void print_help(void)
         "  unsub <topic>             - unsubscribe topic (and remove from list)\r\n"
         "  autosub [on|off]          - auto re-subscribe after reconnect (no arg -> show)\r\n"
         "  subs                      - list current subscribed topics\r\n"
-        "  pub <topic> <payload...> [qos] [retain]\r\n"
+        "  pub <topic> <payload...>  - [qos] [retain]\r\n"
         "  hb on|off                 - heartbeat on/off\r\n"
+        "  hb?                       - show heartbeat status\r\n"
+        "  hb def on|off             - set default heartbeat (NVS)\r\n"
+        "  hb def?                   - show default heartbeat setting\r\n"
         "\r\n"
         "Legacy MQTT:\r\n"
         "  mqtt hb <on|off>          - heartbeat on/off\r\n"
@@ -226,20 +231,52 @@ static bool handle_mqtt_cmd(char *line_mutable)
     }
 
     if (strcmp(cmd, "hb") == 0) {
-        char *sw = next_token(&p);
-        if (!sw) {
-            uart_printf("Usage: hb on|off\r\n");
+        char *arg1 = next_token(&p);
+        if (!arg1) {
+            uart_printf("Usage: hb on|off | hb def on|off | hb def?\r\n");
             return true;
         }
-        if (strcasecmp(sw, "on") == 0 || strcmp(sw, "1") == 0) {
+
+        if (strcasecmp(arg1, "on") == 0 || strcmp(arg1, "1") == 0) {
             mqtt_app_hb_start();
             uart_printf("hb -> on\r\n");
-        } else if (strcasecmp(sw, "off") == 0 || strcmp(sw, "0") == 0) {
+            return true;
+        }
+        if (strcasecmp(arg1, "off") == 0 || strcmp(arg1, "0") == 0) {
             mqtt_app_hb_stop();
             uart_printf("hb -> off\r\n");
-        } else {
-            uart_printf("Usage: hb on|off\r\n");
+            return true;
         }
+
+        if (strcmp(arg1, "def") == 0) {
+            char *arg2 = next_token(&p);
+            if (!arg2) {
+                uart_printf("Usage: hb def on|off\r\n");
+                return true;
+            }
+            if (strcasecmp(arg2, "on") == 0 || strcmp(arg2, "1") == 0) {
+                esp_err_t err = mqtt_app_set_hb_default(true);
+                uart_printf("hb default -> on (%s)\r\n", esp_err_to_name(err));
+            } else if (strcasecmp(arg2, "off") == 0 || strcmp(arg2, "0") == 0) {
+                esp_err_t err = mqtt_app_set_hb_default(false);
+                uart_printf("hb default -> off (%s)\r\n", esp_err_to_name(err));
+            } else {
+                uart_printf("Usage: hb def on|off\r\n");
+            }
+            return true;
+        }
+
+        if (strcmp(arg1, "def?") == 0) {
+            uart_printf("hb default is %s\r\n", mqtt_app_get_hb_default() ? "on" : "off");
+            return true;
+        }
+
+        uart_printf("Usage: hb on|off | hb def on|off | hb def?\r\n");
+        return true;
+    }
+
+    if (strcmp(cmd, "hb?") == 0) {
+        uart_printf("hb is %s\r\n", mqtt_app_is_hb_enabled() ? "on" : "off");
         return true;
     }
 
@@ -398,6 +435,12 @@ void cmd_task(void *arg)
         if (strcmp(msg.line, "time") == 0) {
             if (!time_is_valid()) logi_both(TAG_TIME, "SNTP not synced yet.");
             else print_time_now();
+            continue;
+        }
+
+        if (strcmp(msg.line, "weather") == 0) {
+            weather_request();
+            uart_app_write("Weather requested (result will print when done)\r\n", 48);
             continue;
         }
 

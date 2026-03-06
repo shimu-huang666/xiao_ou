@@ -19,6 +19,7 @@
 #include "uart.h"
 #include "mqtt_app.h"
 #include "cmd.h"
+#include "weather.h"
 void app_main(void)
 {
     esp_err_t ret = nvs_flash_init();
@@ -45,13 +46,17 @@ void app_main(void)
     ESP_ERROR_CHECK(wifi_start_bg_scan_task(NULL, 8192, 9));
 
     // 启动 UART 命令任务
-     ESP_ERROR_CHECK(start_cmd_task("cmd", 4096, 5)); 
-    mqtt_app_init(
+    ESP_ERROR_CHECK(start_cmd_task("cmd", 4096, 5));
+
+    // 启动 weather 后台任务（通过 UART 命令触发一次请求）
+    ESP_ERROR_CHECK(weather_start_task(12 * 1024, 4));
+
+    ESP_ERROR_CHECK(mqtt_app_init(
         "mqtt://broker.emqx.io",
         NULL,
-        "/shimu_test/hb",
-        5000,
+        NULL,
+        0,
         false
-    );
+    ));
     while (1) vTaskDelay(pdMS_TO_TICKS(1000));
 }

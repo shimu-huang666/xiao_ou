@@ -86,6 +86,11 @@ void wifi_print_memory(void);
 void wifi_print_info(void);
 esp_err_t wifi_reconnect_saved(void);
 
+/**
+ * @brief 是否已连接 WiFi 并获取到 IP
+ */
+bool wifi_is_connected(void);
+
 #ifdef __cplusplus
 }
 #endif

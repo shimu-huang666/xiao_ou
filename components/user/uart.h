@@ -28,11 +28,11 @@
 #endif
 
 #ifndef UART_APP_TX_PIN
-#define UART_APP_TX_PIN      GPIO_NUM_43
+#define UART_APP_TX_PIN      GPIO_NUM_41
 #endif
 
 #ifndef UART_APP_RX_PIN
-#define UART_APP_RX_PIN      GPIO_NUM_44
+#define UART_APP_RX_PIN      GPIO_NUM_42
 #endif
 
 #ifndef UART_APP_BAUDRATE

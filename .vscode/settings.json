@@ -5,7 +5,7 @@
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],
-  "idf.port": "/dev/ttyACM1",
+  "idf.port": "/dev/ttyACM0",
   "idf.toolsPath": "/home/shimu/.espressif",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32s3"
@@ -17,6 +17,6 @@
     "--compile-commands-dir=/home/shimu/ESP/WiFi/build"
   ],
   "idf.flashType": "UART",
-  "idf.currentSetup": "/home/shimu/esp/v5.4.3/esp-idf",
+  "idf.currentSetup": "/home/shimu/.espressif/v5.5.3/esp-idf",
   "deepseek.apiKey": "sk-5a6804b9948b420babd5566dd53a0705"
 }

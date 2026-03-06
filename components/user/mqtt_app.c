@@ -38,6 +38,7 @@ static int HEARTBEAT_DEFAULT_OFF = 1;
 
 #define NVS_KEY_SUB_BLOB   "subs_blob"
 #define NVS_KEY_AUTO_RESUB "auto_resub"
+#define NVS_KEY_HB_DEF_ON  "hb_def_on"
 typedef struct {
     char topic[MQTT_APP_TOPIC_MAX_LEN];
     int  qos;
@@ -166,6 +167,19 @@ static esp_err_t nvs_open_mqtt(nvs_handle_t *out)
     if (err != ESP_OK) return err;
 
     return nvs_open(MQTT_APP_NVS_NAMESPACE, NVS_READWRITE, out);
+}
+
+static void mqtt_app_load_hb_default_from_nvs(void)
+{
+    nvs_handle_t h;
+    esp_err_t err = nvs_open_mqtt(&h);
+    if (err != ESP_OK) return;
+
+    uint8_t v = (HEARTBEAT_DEFAULT_OFF == 0) ? 1 : 0;
+    if (nvs_get_u8(h, NVS_KEY_HB_DEF_ON, &v) == ESP_OK) {
+        HEARTBEAT_DEFAULT_OFF = (v ? 0 : 1);
+    }
+    nvs_close(h);
 }
 
 esp_err_t mqtt_app_save_subscriptions_to_nvs(void)
@@ -545,6 +559,7 @@ void mqtt_app_start(const mqtt_app_cfg_t *cfg)
 
     subs_lock_init_once();  
     mqtt_app_load_subscriptions_from_nvs();
+    mqtt_app_load_hb_default_from_nvs();
 
     static char client_id[64];
     make_client_id(client_id, sizeof(client_id));
@@ -560,6 +575,11 @@ void mqtt_app_start(const mqtt_app_cfg_t *cfg)
     s_client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(s_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(s_client);
+
+    // Apply persisted heartbeat default after boot
+    if (!HEARTBEAT_DEFAULT_OFF) {
+        s_cfg.enable_hb = true;
+    }
 
     if (s_cfg.enable_hb) {
         if (s_hb_task == NULL) {
@@ -594,4 +614,28 @@ void mqtt_app_hb_start(void)
         xTaskCreate(heartbeat_task, "mqtt_hb", 4096, NULL, 5, &s_hb_task);
         logi_both(TAG_mqtt, "MQTT heartbeat started");
     }
+}
+
+bool mqtt_app_is_hb_enabled(void)
+{
+    return s_cfg.enable_hb;
+}
+
+esp_err_t mqtt_app_set_hb_default(bool enable)
+{
+    HEARTBEAT_DEFAULT_OFF = enable ? 0 : 1;
+
+    nvs_handle_t h;
+    esp_err_t err = nvs_open_mqtt(&h);
+    if (err != ESP_OK) return err;
+
+    err = nvs_set_u8(h, NVS_KEY_HB_DEF_ON, (uint8_t)(enable ? 1 : 0));
+    if (err == ESP_OK) err = nvs_commit(h);
+    nvs_close(h);
+    return err;
+}
+
+bool mqtt_app_get_hb_default(void)
+{
+    return (HEARTBEAT_DEFAULT_OFF == 0);
 }

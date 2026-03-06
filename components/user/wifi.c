@@ -571,7 +571,6 @@ esp_err_t wifi_forget_last(bool clear_wifi_flash_cfg)
     if (err != ESP_OK) return err;
 
     // 1) 清除 NVS 命名空间（保存的 last AP）
-    err = nvs_erase_all(nvs_open(NVS_NS_WIFI, NVS_READWRITE, &(nvs_handle_t){0}) == ESP_OK ? (nvs_handle_t){0} : 0);
     {
         nvs_handle_t h;
         err = nvs_open(NVS_NS_WIFI, NVS_READWRITE, &h);
@@ -579,6 +578,9 @@ esp_err_t wifi_forget_last(bool clear_wifi_flash_cfg)
             err = nvs_erase_all(h);
             if (err == ESP_OK) err = nvs_commit(h);
             nvs_close(h);
+        } else if (err == ESP_ERR_NVS_NOT_FOUND) {
+            // 命名空间不存在 -> 视为已经清空
+            err = ESP_OK;
         }
     }
     if (err != ESP_OK) return err;
@@ -666,6 +668,11 @@ esp_err_t wifi_connect_by_ssid(const char *ssid, const char *psw)
     logi_both(TAG_WIFI, "Connecting... (timeout, keep retry in background)");
     return ESP_OK;
 }
+bool wifi_is_connected(void)
+{
+    return s.connected;
+}
+
 esp_err_t wifi_reconnect_saved(void)
 {
     esp_err_t err = wifi_init_once();
@@ -735,7 +742,7 @@ static void print_help(void)
         "reconn                 - reconnect using saved STA cfg (flash)\r\n"
         "forget                 - erase last saved wifi (NVS) and disconnect\r\n"
         "mem                    - show saved wifi memory (NVS + STA flash cfg)\r\n"
-        "mqtt [message]""       - mqtt send message                                                 "
+        "mqttsend <message>     - mqtt send message\r\n"
         "help                   - show help\r\n"
 
         ;
