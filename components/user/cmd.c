@@ -38,7 +38,11 @@ static void uart_printf(const char *fmt, ...)
     va_start(ap, fmt);
     int n = vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
-    if (n > 0) uart_app_write(buf, (size_t)n);
+    if (n > 0) {
+        // 如果截断，只写入实际缓冲区大小
+        size_t write_len = (n >= (int)sizeof(buf)) ? sizeof(buf) - 1 : (size_t)n;
+        uart_app_write(buf, write_len);
+    }
 }
 
 /* ------------------------ token helpers (in-place) ------------------------ */
@@ -352,10 +356,14 @@ void cmd_task(void *arg)
         uart_app_write(msg.line, strlen(msg.line));
         uart_app_write("\r\n", 2);
 
-        /* 重要：MQTT命令解析会“就地写\0切token”，所以必须用可写buffer。
+        /* 重要：MQTT命令解析会”就地写\0切token”，所以必须用可写buffer。
            如果 msg.line 是数组 OK；如果是指针且指向只读区，会崩。
          */
         char line_buf[256];
+        size_t src_len = strlen(msg.line);
+        if (src_len >= sizeof(line_buf)) {
+            ESP_LOGW(TAG_CMD, “Input too long (%zu bytes), truncated to %zu”, src_len, sizeof(line_buf) - 1);
+        }
         strlcpy(line_buf, msg.line, sizeof(line_buf));
 
         /* -------- 先处理新 MQTT 命令（不影响你原本命令） -------- */

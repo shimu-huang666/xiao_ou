@@ -1,14 +1,43 @@
 /* WiFi Scan + Sort by RSSI (strong -> weak) + formatted output + UART cmd: conn <index> <psw> connect wifi by scan index
-//2026/2/2 实现内容：上电初始化wifi并扫描附近的wifi，返回wifi列表。 存在问题：返回内容包含logI信息--->已解决。任务栈太小，改成8192 
+//2026/2/2 实现内容：上电初始化wifi并扫描附近的wifi，返回wifi列表。 存在问题：返回内容包含logI信息--->已解决。任务栈太小，改成8192
 
-2/3 
-    实现：从station_example_main示例移植wifi连接，编译通过，已实现账密wifi连接 
-    跟进：从串口获取用户输入的账密 
+2/3
+    实现：从station_example_main示例移植wifi连接，编译通过，已实现账密wifi连接
+    跟进：从串口获取用户输入的账密
 
 2/4 实现：  从串口获取用户输入的账密，编译通过;
             增加连接wifi后显示wifi基本参数，并可以通过info指令查询；
             增加连接wifi后可获取当前时间，并可以通过time指令；
             增加mem、forget、reconn、connssid指令
+
+2/5 实现：  移植MQTT客户端，连接 broker.emqx.io 公共broker;
+            实现 mqttsend 命令发送消息;
+            增加 mqtt hb on/off 心跳控制
+
+2/6 实现：  增加 weather 命令，基于当前WiFi出口IP获取地理位置;
+            集成 Open-Meteo API 获取实时天气(温度、湿度、风速、天气现象);
+            天气任务独立运行，不阻塞命令行
+
+2/7 实现：  MQTT订阅功能升级:
+            - sub <topic> [qos] 订阅主题
+            - unsub <topic> 取消订阅
+            - subs 列出当前订阅
+            - autosub on/off 自动重连后恢复订阅
+            - savesubs 保存订阅列表到NVS
+            增加 reboot 命令重启设备
+
+2/8 实现：  WiFi服务层重构，scan/conn/disconn 改为异步请求模式;
+            避免长时间阻塞UART命令任务;
+            增加 hb def on/off 设置心跳默认状态(NVS持久化)
+
+2/9 优化：  代码结构优化，模块间接口清晰化;
+            增加详细的命令帮助信息;
+            修复若干边界情况处理
+
+待办：
+    - OTA 远程升级支持
+    - LVGL 图形界面集成
+    - 更多传感器驱动
 */
 
 #include "nvs_flash.h"

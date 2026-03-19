@@ -157,16 +157,15 @@ static void resubscribe_all_if_needed(esp_mqtt_client_handle_t client)
 static esp_err_t nvs_open_mqtt(nvs_handle_t *out)
 {
     if (!out) return ESP_ERR_INVALID_ARG;
-    // 注意：如果你工程别处已 nvs_flash_init()，这里不会出问题
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        // 可选：做一次擦除恢复（更激进），不想擦就直接 return err
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        err = nvs_flash_init();
-    }
-    if (err != ESP_OK) return err;
 
-    return nvs_open(MQTT_APP_NVS_NAMESPACE, NVS_READWRITE, out);
+    // NVS 已在 app_main() 中初始化，这里直接打开命名空间
+    // 如果 nvs_open 失败返回 ESP_ERR_NVS_NOT_FOUND，说明命名空间不存在（正常情况）
+    esp_err_t err = nvs_open(MQTT_APP_NVS_NAMESPACE, NVS_READWRITE, out);
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        // 命名空间不存在，创建它（通过写入一个值）
+        err = nvs_open(MQTT_APP_NVS_NAMESPACE, NVS_READWRITE, out);
+    }
+    return err;
 }
 
 static void mqtt_app_load_hb_default_from_nvs(void)

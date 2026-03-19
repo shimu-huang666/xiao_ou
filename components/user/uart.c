@@ -247,7 +247,12 @@ void logi_both(const char *tag, const char *fmt, ...)
     int n = vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
 
-    if (n <= 0) return;
+    if (n < 0) return;
+
+    // 检测是否发生截断
+    if (n >= (int)sizeof(buf)) {
+        ESP_LOGW(TAG, "logi_both: output truncated (need %d bytes, have %zu)", n, sizeof(buf));
+    }
 
     ESP_LOGI(tag, "%s", buf);
     uart_app_write(buf, strnlen(buf, sizeof(buf)));
