@@ -362,7 +362,7 @@ void cmd_task(void *arg)
         char line_buf[256];
         size_t src_len = strlen(msg.line);
         if (src_len >= sizeof(line_buf)) {
-            ESP_LOGW(TAG_CMD, “Input too long (%zu bytes), truncated to %zu”, src_len, sizeof(line_buf) - 1);
+            ESP_LOGW(TAG_CMD, "Input too long (%zu bytes), truncated to %zu", src_len, sizeof(line_buf) - 1);
         }
         strlcpy(line_buf, msg.line, sizeof(line_buf));
 

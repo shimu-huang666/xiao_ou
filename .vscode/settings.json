@@ -1,6 +1,6 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
-  "idf.espIdfPath": "/home/shimu/esp/v5.4.3/esp-idf",
+  "idf.espIdfPath": "/home/shimu/esp/v5.5.3/esp-idf",
   "idf.pythonInstallPath": "/usr/bin/python3",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
