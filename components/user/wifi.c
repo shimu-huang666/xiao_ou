@@ -128,6 +128,7 @@ typedef struct {
 
 static esp_err_t wifi_save_last_ap(const wifi_ap_record_t *ap)
 {
+    //打开命名空间
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NS_WIFI, NVS_READWRITE, &h);
     if (err != ESP_OK) return err;
@@ -135,7 +136,7 @@ static esp_err_t wifi_save_last_ap(const wifi_ap_record_t *ap)
     char ssid[33] = {0};
     memcpy(ssid, ap->ssid, sizeof(ap->ssid));
     ssid[32] = 0;
-
+    //写入Wifi信息
     err = nvs_set_str(h, NVS_KEY_SSID, ssid);
     if (err == ESP_OK) err = nvs_set_blob(h, NVS_KEY_BSSID, ap->bssid, 6);
     if (err == ESP_OK) err = nvs_set_u8(h, NVS_KEY_AUTH, (uint8_t)ap->authmode);
@@ -153,6 +154,7 @@ static wifi_last_ap_t wifi_load_last_ap(void)
     if (nvs_open(NVS_NS_WIFI, NVS_READONLY, &h) != ESP_OK) return out;
 
     size_t len = sizeof(out.ssid);
+    //读取
     if (nvs_get_str(h, NVS_KEY_SSID, out.ssid, &len) == ESP_OK) {
         size_t blen = 6;
         if (nvs_get_blob(h, NVS_KEY_BSSID, out.bssid, &blen) == ESP_OK && blen == 6) {
@@ -502,66 +504,133 @@ esp_err_t wifi_connect_by_index(int idx_1based, const char *psw_opt)
     return ESP_OK;
 }
 
+/**
+ * @brief 自动连接上次保存的WiFi热点
+ *
+ * 功能：从NVS读取上次成功连接的AP信息，尝试自动重连
+ *
+ * 连接策略（两种路径）：
+ *   1. 如果扫描缓存中有匹配的AP（通过BSSID匹配），直接用缓存连接
+ *   2. 否则，使用NVS保存的SSID/BSSID构造配置进行连接
+ *
+ * @return esp_err_t
+ *   - ESP_OK: 连接成功
+ *   - ESP_ERR_NOT_FOUND: NVS中没有保存的WiFi记录
+ *   - ESP_FAIL: 连接失败
+ */
 esp_err_t wifi_auto_connect_last(void)
 {
+    /* ========== 第1步：初始化WiFi ==========
+     * 确保WiFi栈已启动（如果是首次调用会初始化netif、event loop等）
+     */
     esp_err_t err = wifi_init_once();
     if (err != ESP_OK) return err;
 
+    /* ========== 第2步：从NVS读取上次保存的AP信息 ==========
+     * wifi_load_last_ap() 返回一个结构体，包含：
+     *   - ssid:      热点名称（最多32字符）
+     *   - bssid:     MAC地址（6字节）
+     *   - authmode:  认证模式（WPA2/WPA3等）
+     *   - has_bssid: 是否有有效的BSSID
+     *   - valid:     整体数据是否有效
+     */
     wifi_last_ap_t last = wifi_load_last_ap();
     if (!last.valid) {
         logi_both(TAG_WIFI, "No last wifi record.");
-        return ESP_ERR_NOT_FOUND;
+        return ESP_ERR_NOT_FOUND;  // NVS中没有记录，直接返回
     }
 
+    /* ========== 第3步：尝试从扫描缓存中快速匹配 ==========
+     * 如果之前执行过扫描（s.ap_cache_num > 0），且保存的BSSID有效，
+     * 则在缓存中查找是否有完全匹配的AP。
+     *
+     * 好处：使用缓存连接可以利用最新的RSSI、信道等信息，
+     *       且复用 wifi_connect_by_index 的逻辑（包括密码复用）
+     */
     if (s.ap_cache_num > 0 && last.has_bssid) {
-        int idx0 = cache_find_by_bssid(last.bssid);
+        int idx0 = cache_find_by_bssid(last.bssid);  // 在缓存中查找BSSID
         if (idx0 >= 0) {
+            // 找到了！用缓存中的索引直接连接（索引+1因为用户侧是1-based）
             logi_both(TAG_WIFI, "Auto connect (cache): %s", last.ssid);
             return wifi_connect_by_index(idx0 + 1, NULL);
         }
     }
 
+    /* ========== 第4步：缓存未命中，使用保存的配置直接连接 ==========
+     * 这种情况发生在：
+     *   - 还没扫描过（缓存为空）
+     *   - 扫描结果中没有找到相同BSSID的AP（可能AP换了信道/位置）
+     *
+     * 策略：用NVS保存的信息构造wifi_config，让WiFi栈自己搜索并连接
+     */
+
+    // 4.1 先读取当前flash中保存的STA配置（主要是为了复用密码）
     wifi_config_t cfg = {0};
     if (esp_wifi_get_config(WIFI_IF_STA, &cfg) != ESP_OK) memset(&cfg, 0, sizeof(cfg));
 
-    strncpy((char*)cfg.sta.ssid, last.ssid, sizeof(cfg.sta.ssid) - 1);
-    cfg.sta.threshold.authmode = last.authmode;
+    // 4.2 用NVS保存的信息覆盖配置
+    strncpy((char*)cfg.sta.ssid, last.ssid, sizeof(cfg.sta.ssid) - 1);  // 设置SSID
+    cfg.sta.threshold.authmode = last.authmode;  // 设置最低认证模式要求
 
+    // 4.3 如果有BSSID，锁定到特定AP（避免连到同名其他AP）
     if (last.has_bssid) {
         cfg.sta.bssid_set = 1;
         memcpy(cfg.sta.bssid, last.bssid, 6);
     } else {
-        cfg.sta.bssid_set = 0;
+        cfg.sta.bssid_set = 0;  // 不锁定BSSID，让WiFi栈自己选择
     }
 
+    /* ========== 第5步：准备事件同步 ==========
+     * 清除之前的事件位，重置重试计数器
+     */
     xEventGroupClearBits(s.ev, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
     s.retry_num = 0;
 
     logi_both(TAG_WIFI, "Auto connect (saved cfg): ssid='%s' bssid_set=%d",
               cfg.sta.ssid, cfg.sta.bssid_set);
 
+    /* ========== 第6步：配置WiFi并启动连接 ==========
+     * 设置STA模式 -> 写入配置 -> 断开旧连接 -> 发起新连接
+     */
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &cfg));
 
-    esp_wifi_disconnect();
-    s.manual_disconnect = false;
-    ESP_ERROR_CHECK(esp_wifi_connect());
+    esp_wifi_disconnect();      // 确保先断开（如果有旧连接）
+    s.manual_disconnect = false; // 标记：这不是用户手动断开，允许自动重连
+    ESP_ERROR_CHECK(esp_wifi_connect());  // 发起连接（非阻塞，结果通过事件通知）
 
+    /* ========== 第7步：等待连接结果 ==========
+     * 阻塞等待 WIFI_CONNECTED_BIT 或 WIFI_FAIL_BIT 事件
+     * 超时时间：WIFI_CONNECT_TIMEOUT_MS（15秒）
+     *
+     * xEventGroupWaitBits 参数说明：
+     *   - 参数2: 等待的事件位（连接成功或失败）
+     *   - 参数3: pdFALSE = 不自动清除位
+     *   - 参数4: pdFALSE = 等待任意一个位（不是全部）
+     *   - 参数5: 超时时间（ticks）
+     */
     EventBits_t bits = xEventGroupWaitBits(
         s.ev, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
         pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONNECT_TIMEOUT_MS));
 
+    /* ========== 第8步：处理连接结果 ========== */
+
+    // 8.1 连接成功
     if (bits & WIFI_CONNECTED_BIT) {
         logi_both(TAG_WIFI, "Auto connected OK.");
-        wifi_print_info();
-        time_sync_init();
+        wifi_print_info();     // 打印当前连接详情（SSID、IP、MAC等）
+        time_sync_init();      // 启动时间同步（SNTP）
         return ESP_OK;
     }
+
+    // 8.2 连接失败（重试次数用尽）
     if (bits & WIFI_FAIL_BIT) {
         logi_both(TAG_WIFI, "Auto connect failed.");
         return ESP_FAIL;
     }
 
+    // 8.3 超时（WiFi栈仍在后台重试）
+    // 不算失败，因为事件处理器会继续重试
     logi_both(TAG_WIFI, "Auto connecting... (timeout, keep retry in background)");
     return ESP_OK;
 }
