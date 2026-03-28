@@ -191,12 +191,12 @@ void wifi_print_info(void)
         uint8_t mac[6] = {0};
         esp_wifi_get_mac(WIFI_IF_STA, mac);
 
-        logi_both(TAG_WIFI, "WiFi status: NOT CONNECTED");
-        logi_both(TAG_WIFI, "STA MAC: %02x:%02x:%02x:%02x:%02x:%02x",
+        ESP_LOGI(TAG_WIFI, "WiFi status: NOT CONNECTED");
+        ESP_LOGI(TAG_WIFI, "STA MAC: %02x:%02x:%02x:%02x:%02x:%02x",
                   mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
         if (err_ap != ESP_OK) {
-            logi_both(TAG_WIFI, "sta_get_ap_info failed: %s", esp_err_to_name(err_ap));
+            ESP_LOGI(TAG_WIFI, "sta_get_ap_info failed: %s", esp_err_to_name(err_ap));
         }
         return;
     }
@@ -204,34 +204,34 @@ void wifi_print_info(void)
     char bssid[18];
     bssid_to_str(ap.bssid, bssid);
 
-    logi_both(TAG_WIFI, "WiFi status: CONNECTED");
-    logi_both(TAG_WIFI, "SSID: %s", (char *)ap.ssid);
-    logi_both(TAG_WIFI, "BSSID: %s", bssid);
-    logi_both(TAG_WIFI, "Channel: %d", ap.primary);
-    logi_both(TAG_WIFI, "RSSI: %d dBm", ap.rssi);
-    logi_both(TAG_WIFI, "Auth: %s", authmode_str(ap.authmode));
-    logi_both(TAG_WIFI, "Pairwise: %s", cipher_str(ap.pairwise_cipher));
-    logi_both(TAG_WIFI, "Group: %s", cipher_str(ap.group_cipher));
+    ESP_LOGI(TAG_WIFI, "WiFi status: CONNECTED");
+    ESP_LOGI(TAG_WIFI, "SSID: %s", (char *)ap.ssid);
+    ESP_LOGI(TAG_WIFI, "BSSID: %s", bssid);
+    ESP_LOGI(TAG_WIFI, "Channel: %d", ap.primary);
+    ESP_LOGI(TAG_WIFI, "RSSI: %d dBm", ap.rssi);
+    ESP_LOGI(TAG_WIFI, "Auth: %s", authmode_str(ap.authmode));
+    ESP_LOGI(TAG_WIFI, "Pairwise: %s", cipher_str(ap.pairwise_cipher));
+    ESP_LOGI(TAG_WIFI, "Group: %s", cipher_str(ap.group_cipher));
 
     uint8_t mac[6] = {0};
     esp_wifi_get_mac(WIFI_IF_STA, mac);
-    logi_both(TAG_WIFI, "STA MAC: %02x:%02x:%02x:%02x:%02x:%02x",
+    ESP_LOGI(TAG_WIFI, "STA MAC: %02x:%02x:%02x:%02x:%02x:%02x",
               mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     if (s.sta_netif) {
         esp_netif_ip_info_t ip_info;
         if (esp_netif_get_ip_info(s.sta_netif, &ip_info) == ESP_OK) {
-            logi_both(TAG_WIFI, "IP: " IPSTR, IP2STR(&ip_info.ip));
-            logi_both(TAG_WIFI, "GW: " IPSTR, IP2STR(&ip_info.gw));
-            logi_both(TAG_WIFI, "MASK: " IPSTR, IP2STR(&ip_info.netmask));
+            ESP_LOGI(TAG_WIFI, "IP: " IPSTR, IP2STR(&ip_info.ip));
+            ESP_LOGI(TAG_WIFI, "GW: " IPSTR, IP2STR(&ip_info.gw));
+            ESP_LOGI(TAG_WIFI, "MASK: " IPSTR, IP2STR(&ip_info.netmask));
         }
 
         esp_netif_dns_info_t dns;
         if (esp_netif_get_dns_info(s.sta_netif, ESP_NETIF_DNS_MAIN, &dns) == ESP_OK) {
-            logi_both(TAG_WIFI, "DNS1: " IPSTR, IP2STR(&dns.ip.u_addr.ip4));
+            ESP_LOGI(TAG_WIFI, "DNS1: " IPSTR, IP2STR(&dns.ip.u_addr.ip4));
         }
         if (esp_netif_get_dns_info(s.sta_netif, ESP_NETIF_DNS_BACKUP, &dns) == ESP_OK) {
-            logi_both(TAG_WIFI, "DNS2: " IPSTR, IP2STR(&dns.ip.u_addr.ip4));
+            ESP_LOGI(TAG_WIFI, "DNS2: " IPSTR, IP2STR(&dns.ip.u_addr.ip4));
         }
     }
 }
@@ -241,15 +241,15 @@ void wifi_print_memory(void)
     wifi_last_ap_t last = wifi_load_last_ap();
 
     if (!last.valid) {
-        logi_both(TAG_WIFI, "[MEM] NVS last AP: <empty>");
+        ESP_LOGI(TAG_WIFI, "[MEM] NVS last AP: <empty>");
     } else {
         if (last.has_bssid) {
             char bssid[18];
             bssid_to_str(last.bssid, bssid);
-            logi_both(TAG_WIFI, "[MEM] NVS last AP: ssid='%s' bssid=%s auth=%s",
+            ESP_LOGI(TAG_WIFI, "[MEM] NVS last AP: ssid='%s' bssid=%s auth=%s",
                       last.ssid, bssid, authmode_str(last.authmode));
         } else {
-            logi_both(TAG_WIFI, "[MEM] NVS last AP: ssid='%s' bssid=<none> auth=%s",
+            ESP_LOGI(TAG_WIFI, "[MEM] NVS last AP: ssid='%s' bssid=<none> auth=%s",
                       last.ssid, authmode_str(last.authmode));
         }
     }
@@ -258,7 +258,7 @@ void wifi_print_memory(void)
     wifi_config_t cfg = {0};
     esp_err_t err = esp_wifi_get_config(WIFI_IF_STA, &cfg);
     if (err != ESP_OK) {
-        logi_both(TAG_WIFI, "[MEM] STA cfg (flash): read failed: %s", esp_err_to_name(err));
+        ESP_LOGI(TAG_WIFI, "[MEM] STA cfg (flash): read failed: %s", esp_err_to_name(err));
         return;
     }
 
@@ -266,7 +266,7 @@ void wifi_print_memory(void)
     bool has_ssid = ssid[0] != '\0';
     bool has_psw  = cfg.sta.password[0] != '\0';
 
-    logi_both(TAG_WIFI, "[MEM] STA cfg (flash): ssid=%s, password=%s, bssid_set=%d",
+    ESP_LOGI(TAG_WIFI, "[MEM] STA cfg (flash): ssid=%s, password=%s, bssid_set=%d",
               has_ssid ? ssid : "<empty>",
               has_psw ? "<set>" : "<empty>",
               (int)cfg.sta.bssid_set);
@@ -274,7 +274,7 @@ void wifi_print_memory(void)
     if (cfg.sta.bssid_set) {
         char bssid[18];
         bssid_to_str(cfg.sta.bssid, bssid);
-        logi_both(TAG_WIFI, "[MEM] STA cfg (flash): bssid=%s", bssid);
+        ESP_LOGI(TAG_WIFI, "[MEM] STA cfg (flash): bssid=%s", bssid);
     }
 }
 
@@ -362,7 +362,7 @@ esp_err_t wifi_init_once(void)
 void wifi_scan_once_and_print_sorted(void)
 {
     if (wifi_init_once() != ESP_OK) {
-        logi_both(TAG_SCAN, "wifi init failed");
+        ESP_LOGI(TAG_SCAN, "wifi init failed");
         return;
     }
 
@@ -379,7 +379,7 @@ void wifi_scan_once_and_print_sorted(void)
     ESP_LOGI(TAG_SCAN, "Start scan...");
     esp_err_t err = esp_wifi_scan_start(&scan_cfg, true); // block=true
     if (err != ESP_OK) {
-        logi_both(TAG_SCAN, "scan start failed: %s", esp_err_to_name(err));
+        ESP_LOGI(TAG_SCAN, "scan start failed: %s", esp_err_to_name(err));
         return;
     }
 
@@ -401,10 +401,10 @@ void wifi_scan_once_and_print_sorted(void)
         memcpy(s.ap_cache, ap_info, number * sizeof(wifi_ap_record_t));
     }
 
-    logi_both(TAG_SCAN, "-------- WIFI SCAN RESULT (sorted by RSSI) --------------");
-    logi_both(TAG_SCAN, "%-3s %-32s %-3s %-10s %-9s %-9s %-17s %-5s",
+    ESP_LOGI(TAG_SCAN, "-------- WIFI SCAN RESULT (sorted by RSSI) --------------");
+    ESP_LOGI(TAG_SCAN, "%-3s %-32s %-3s %-10s %-9s %-9s %-17s %-5s",
               "No", "SSID", "CH", "AUTH", "PAIR", "GROUP", "BSSID", "RSSI");
-    logi_both(TAG_SCAN, "------------------------------------------------------------------------------------------------------");
+    ESP_LOGI(TAG_SCAN, "------------------------------------------------------------------------------------------------------");
 
     for (int i = 0; i < number; i++) {
         char bssid[18];
@@ -415,7 +415,7 @@ void wifi_scan_once_and_print_sorted(void)
         memcpy(ssid, ap_info[i].ssid, 32);
         ssid[32] = '\0';
 
-        logi_both(TAG_SCAN, "%-3d %-32.32s %-3d %-10s %-9s %-9s %-17s %-5d",
+        ESP_LOGI(TAG_SCAN, "%-3d %-32.32s %-3d %-10s %-9s %-9s %-17s %-5d",
                   i + 1,
                   ssid,
                   ap_info[i].primary,
@@ -426,7 +426,7 @@ void wifi_scan_once_and_print_sorted(void)
                   ap_info[i].rssi);
     }
 
-    logi_both(TAG_SCAN, "------------------------------------------------------------------------------------------------------");
+    ESP_LOGI(TAG_SCAN, "------------------------------------------------------------------------------------------------------");
 }
 
 esp_err_t wifi_connect_by_index(int idx_1based, const char *psw_opt)
@@ -435,11 +435,11 @@ esp_err_t wifi_connect_by_index(int idx_1based, const char *psw_opt)
     if (err != ESP_OK) return err;
 
     if (s.ap_cache_num == 0) {
-        logi_both(TAG_SCAN, "No scan cache. Please run: scan");
+        ESP_LOGI(TAG_SCAN, "No scan cache. Please run: scan");
         return ESP_FAIL;
     }
     if (idx_1based < 1 || idx_1based > (int)s.ap_cache_num) {
-        logi_both(TAG_SCAN, "Index out of range. Valid: 1..%u", s.ap_cache_num);
+        ESP_LOGI(TAG_SCAN, "Index out of range. Valid: 1..%u", s.ap_cache_num);
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -472,7 +472,7 @@ esp_err_t wifi_connect_by_index(int idx_1based, const char *psw_opt)
     xEventGroupClearBits(s.ev, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
     s.retry_num = 0;
 
-    logi_both(TAG_WIFI, "Target AP: ssid='%s' bssid=%02x:%02x:%02x:%02x:%02x:%02x ch=%d rssi=%d auth=%s",
+    ESP_LOGI(TAG_WIFI, "Target AP: ssid='%s' bssid=%02x:%02x:%02x:%02x:%02x:%02x ch=%d rssi=%d auth=%s",
               (char *)ap->ssid,
               ap->bssid[0], ap->bssid[1], ap->bssid[2], ap->bssid[3], ap->bssid[4], ap->bssid[5],
               ap->primary, ap->rssi, authmode_str(ap->authmode));
@@ -489,18 +489,18 @@ esp_err_t wifi_connect_by_index(int idx_1based, const char *psw_opt)
         pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONNECT_TIMEOUT_MS));
 
     if (bits & WIFI_CONNECTED_BIT) {
-        logi_both(TAG_WIFI, "Connected OK.");
+        ESP_LOGI(TAG_WIFI, "Connected OK.");
         wifi_print_info();
         time_sync_init();
         wifi_save_last_ap(ap);
         return ESP_OK;
     }
     if (bits & WIFI_FAIL_BIT) {
-        logi_both(TAG_WIFI, "Connect failed.");
+        ESP_LOGI(TAG_WIFI, "Connect failed.");
         return ESP_FAIL;
     }
 
-    logi_both(TAG_WIFI, "Connecting... (timeout, keep retry in background)");
+    ESP_LOGI(TAG_WIFI, "Connecting... (timeout, keep retry in background)");
     return ESP_OK;
 }
 
@@ -536,7 +536,7 @@ esp_err_t wifi_auto_connect_last(void)
      */
     wifi_last_ap_t last = wifi_load_last_ap();
     if (!last.valid) {
-        logi_both(TAG_WIFI, "No last wifi record.");
+        ESP_LOGI(TAG_WIFI, "No last wifi record.");
         return ESP_ERR_NOT_FOUND;  // NVS中没有记录，直接返回
     }
 
@@ -550,8 +550,8 @@ esp_err_t wifi_auto_connect_last(void)
     if (s.ap_cache_num > 0 && last.has_bssid) {
         int idx0 = cache_find_by_bssid(last.bssid);  // 在缓存中查找BSSID
         if (idx0 >= 0) {
-            // 找到了！用缓存中的索引直接连接（索引+1因为用户侧是1-based）
-            logi_both(TAG_WIFI, "Auto connect (cache): %s", last.ssid);
+            // 用缓存中的索引直接连接（索引+1因为用户侧是1-based）
+            ESP_LOGI(TAG_WIFI, "Auto connect (cache): %s", last.ssid);
             return wifi_connect_by_index(idx0 + 1, NULL);
         }
     }
@@ -586,7 +586,7 @@ esp_err_t wifi_auto_connect_last(void)
     xEventGroupClearBits(s.ev, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
     s.retry_num = 0;
 
-    logi_both(TAG_WIFI, "Auto connect (saved cfg): ssid='%s' bssid_set=%d",
+    ESP_LOGI(TAG_WIFI, "Auto connect (saved cfg): ssid='%s' bssid_set=%d",
               cfg.sta.ssid, cfg.sta.bssid_set);
 
     /* ========== 第6步：配置WiFi并启动连接 ==========
@@ -617,7 +617,7 @@ esp_err_t wifi_auto_connect_last(void)
 
     // 8.1 连接成功
     if (bits & WIFI_CONNECTED_BIT) {
-        logi_both(TAG_WIFI, "Auto connected OK.");
+        ESP_LOGI(TAG_WIFI, "Auto connected OK.");
         wifi_print_info();     // 打印当前连接详情（SSID、IP、MAC等）
         time_sync_init();      // 启动时间同步（SNTP）
         return ESP_OK;
@@ -625,13 +625,13 @@ esp_err_t wifi_auto_connect_last(void)
 
     // 8.2 连接失败（重试次数用尽）
     if (bits & WIFI_FAIL_BIT) {
-        logi_both(TAG_WIFI, "Auto connect failed.");
+        ESP_LOGI(TAG_WIFI, "Auto connect failed.");
         return ESP_FAIL;
     }
 
     // 8.3 超时（WiFi栈仍在后台重试）
     // 不算失败，因为事件处理器会继续重试
-    logi_both(TAG_WIFI, "Auto connecting... (timeout, keep retry in background)");
+    ESP_LOGI(TAG_WIFI, "Auto connecting... (timeout, keep retry in background)");
     return ESP_OK;
 }
 esp_err_t wifi_forget_last(bool clear_wifi_flash_cfg)
@@ -667,7 +667,7 @@ esp_err_t wifi_forget_last(bool clear_wifi_flash_cfg)
     s.retry_num = 0;
     esp_wifi_disconnect();
 
-    logi_both(TAG_WIFI, "Forgot last WiFi record%s.",
+    ESP_LOGI(TAG_WIFI, "Forgot last WiFi record%s.",
               clear_wifi_flash_cfg ? " + cleared flash STA cfg" : "");
     return ESP_OK;
 }
@@ -700,7 +700,7 @@ esp_err_t wifi_connect_by_ssid(const char *ssid, const char *psw)
     xEventGroupClearBits(s.ev, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
     s.retry_num = 0;
 
-    logi_both(TAG_WIFI, "Connect by SSID: '%s'", ssid);
+    ESP_LOGI(TAG_WIFI, "Connect by SSID: '%s'", ssid);
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
@@ -714,7 +714,7 @@ esp_err_t wifi_connect_by_ssid(const char *ssid, const char *psw)
         pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONNECT_TIMEOUT_MS));
 
     if (bits & WIFI_CONNECTED_BIT) {
-        logi_both(TAG_WIFI, "Connected OK.");
+        ESP_LOGI(TAG_WIFI, "Connected OK.");
         wifi_print_info();
         time_sync_init();
 
@@ -730,11 +730,11 @@ esp_err_t wifi_connect_by_ssid(const char *ssid, const char *psw)
         return ESP_OK;
     }
     if (bits & WIFI_FAIL_BIT) {
-        logi_both(TAG_WIFI, "Connect failed.");
+        ESP_LOGI(TAG_WIFI, "Connect failed.");
         return ESP_FAIL;
     }
 
-    logi_both(TAG_WIFI, "Connecting... (timeout, keep retry in background)");
+    ESP_LOGI(TAG_WIFI, "Connecting... (timeout, keep retry in background)");
     return ESP_OK;
 }
 bool wifi_is_connected(void)
@@ -752,7 +752,7 @@ esp_err_t wifi_reconnect_saved(void)
     if (err != ESP_OK) return err;
 
     if (cfg.sta.ssid[0] == '\0') {
-        logi_both(TAG_WIFI, "No saved STA cfg (ssid empty). Use conn/connssid first.");
+        ESP_LOGI(TAG_WIFI, "No saved STA cfg (ssid empty). Use conn/connssid first.");
         return ESP_ERR_NOT_FOUND;
     }
 
@@ -762,7 +762,7 @@ esp_err_t wifi_reconnect_saved(void)
     xEventGroupClearBits(s.ev, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
     s.retry_num = 0;
 
-    logi_both(TAG_WIFI, "Reconnecting using saved STA cfg: ssid='%s'%s",
+    ESP_LOGI(TAG_WIFI, "Reconnecting using saved STA cfg: ssid='%s'%s",
               (char*)cfg.sta.ssid,
               cfg.sta.password[0] ? " (psw set)" : " (psw empty)");
 
@@ -778,17 +778,17 @@ esp_err_t wifi_reconnect_saved(void)
         pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONNECT_TIMEOUT_MS));
 
     if (bits & WIFI_CONNECTED_BIT) {
-        logi_both(TAG_WIFI, "Reconnected OK.");
+        ESP_LOGI(TAG_WIFI, "Reconnected OK.");
         wifi_print_info();
         time_sync_init();
         return ESP_OK;
     }
     if (bits & WIFI_FAIL_BIT) {
-        logi_both(TAG_WIFI, "Reconnect failed.");
+        ESP_LOGI(TAG_WIFI, "Reconnect failed.");
         return ESP_FAIL;
     }
 
-    logi_both(TAG_WIFI, "Reconnecting... (timeout, keep retry in background)");
+    ESP_LOGI(TAG_WIFI, "Reconnecting... (timeout, keep retry in background)");
     return ESP_OK;
 }
 

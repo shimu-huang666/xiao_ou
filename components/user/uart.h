@@ -92,7 +92,6 @@ int uart_app_write(const void *data, size_t len);
  */
 int uart_app_read(uint8_t *buf, size_t len, TickType_t ticks_to_wait);
 
-void logi_both(const char *tag, const char *fmt, ...);
 /**
  * @brief 立即清空 UART RX 缓冲（用于异常恢复）
  */

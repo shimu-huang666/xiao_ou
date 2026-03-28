@@ -7,11 +7,7 @@
 #include "esp_err.h"
 #include "esp_wifi.h"
 
-// 你已有的 WiFi API（来自 wifi.c / wifi.h）
 #include "wifi.h"
-
-// 你已有的 UART 打印（来自 uart.c）
-extern void logi_both(const char *tag, const char *fmt, ...);
 
 static const char *TAG = "wifi_svc";
 
@@ -27,9 +23,9 @@ static void scan_worker_task(void *arg)
 {
     (void)arg;
 
-    logi_both("scan", "Scan worker started...");
+    ESP_LOGI("scan", "Scan worker started...");
     wifi_scan_once_and_print_sorted();
-    logi_both("scan", "Scan worker done.");
+    ESP_LOGI("scan", "Scan worker done.");
 
     s_busy = false;
     vTaskDelete(NULL);
@@ -50,7 +46,7 @@ static void wifi_service_task(void *arg)
 
         // 简单策略：正在执行长操作时，拒绝新请求（你也可以改成排队/覆盖）
         if (s_busy) {
-            logi_both(TAG, "Busy, ignore req=%d", (int)r.type);
+            ESP_LOGI(TAG, "Busy, ignore req=%d", (int)r.type);
             continue;
         }
 
@@ -61,7 +57,7 @@ static void wifi_service_task(void *arg)
             BaseType_t ok = xTaskCreate(scan_worker_task, "wifi_scan_w", 4096, NULL, 9, NULL);
             if (ok != pdPASS) {
                 s_busy = false;
-                logi_both(TAG, "Create scan worker failed");
+                ESP_LOGI(TAG, "Create scan worker failed");
             }
             break;
         }
@@ -69,12 +65,12 @@ static void wifi_service_task(void *arg)
         case WIFI_REQ_CONN_INDEX: {
             s_busy = true;
 
-            logi_both("wifi", "Connect request: index=%d", r.u.conn_index.index);
+            ESP_LOGI("wifi", "Connect request: index=%d", r.u.conn_index.index);
             esp_err_t e = wifi_connect_by_index(
                 r.u.conn_index.index,
                 r.u.conn_index.has_psw ? r.u.conn_index.psw : NULL
             );
-            logi_both("wifi", "Connect result: %s", esp_err_to_name(e));
+            ESP_LOGI("wifi", "Connect result: %s", esp_err_to_name(e));
 
             s_busy = false;
             break;
@@ -83,9 +79,9 @@ static void wifi_service_task(void *arg)
         case WIFI_REQ_CONN_SSID: {
             s_busy = true;
 
-            logi_both("wifi", "Connect request: ssid='%s'", r.u.conn_ssid.ssid);
+            ESP_LOGI("wifi", "Connect request: ssid='%s'", r.u.conn_ssid.ssid);
             esp_err_t e = wifi_connect_by_ssid(r.u.conn_ssid.ssid, r.u.conn_ssid.psw);
-            logi_both("wifi", "Connect result: %s", esp_err_to_name(e));
+            ESP_LOGI("wifi", "Connect result: %s", esp_err_to_name(e));
 
             s_busy = false;
             break;
@@ -95,14 +91,14 @@ static void wifi_service_task(void *arg)
             // 手动断开：不要在 cmd.c 里直接改 wifi_ctx_t
             // 这里最保守、最通用的做法：直接调用 esp_wifi_disconnect()
             // 如果你在 wifi.c 里做了 wifi_disconnect_manual()，这里换成那个更好
-            logi_both("wifi", "Manual disconnect requested");
+            ESP_LOGI("wifi", "Manual disconnect requested");
             esp_wifi_disconnect();
             s_busy = false;
             break;
         }
 
         default:
-            logi_both(TAG, "Unknown req=%d", (int)r.type);
+            ESP_LOGI(TAG, "Unknown req=%d", (int)r.type);
             break;
         }
     }

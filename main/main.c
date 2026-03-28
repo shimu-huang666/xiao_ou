@@ -14,9 +14,7 @@
             实现 mqttsend 命令发送消息;
             增加 mqtt hb on/off 心跳控制
 
-2/6 实现：  增加 weather 命令，基于当前WiFi出口IP获取地理位置;
-            集成 Open-Meteo API 获取实时天气(温度、湿度、风速、天气现象);
-            天气任务独立运行，不阻塞命令行
+
 
 2/7 实现：  MQTT订阅功能升级:
             - sub <topic> [qos] 订阅主题
@@ -34,21 +32,21 @@
             增加详细的命令帮助信息;
             修复若干边界情况处理
 
-待办：
-    - OTA 远程升级支持
-    - LVGL 图形界面集成
-    - 更多传感器驱动
-*/
+3/10 实现：  增加 weather 命令，基于当前WiFi出口IP获取地理位置;
+            集成 Open-Meteo API 获取实时天气(温度、湿度、风速、天气现象);
+            天气任务独立运行，不阻塞命令行
 
+*/
+//在D盘
 #include "nvs_flash.h"
 #include "esp_err.h"
 #include "esp_log.h"
 
 #include "wifi.h"
-#include "uart.h"
 #include "mqtt_app.h"
-#include "cmd.h"
 #include "weather.h"
+#include "console_init.h"
+
 void app_main(void)
 {
     esp_err_t ret = nvs_flash_init();
@@ -59,7 +57,6 @@ void app_main(void)
         ESP_ERROR_CHECK(ret);
     }
 
-    ESP_ERROR_CHECK(uart_app_init());
     ESP_ERROR_CHECK(wifi_init_once());
 
     esp_err_t e = wifi_auto_connect_last();
@@ -72,12 +69,12 @@ void app_main(void)
     }
 
     // 可选：启动后台自动扫一次
-    ESP_ERROR_CHECK(wifi_start_bg_scan_task(NULL, 8192, 9));
+    // ESP_ERROR_CHECK(wifi_start_bg_scan_task(NULL, 8192, 9));
 
-    // 启动 UART 命令任务
-    ESP_ERROR_CHECK(start_cmd_task("cmd", 4096, 5));
+    // 启动 ESP-IDF Console REPL (替代旧的 UART 命令任务)
+    ESP_ERROR_CHECK(console_start());
 
-    // 启动 weather 后台任务（通过 UART 命令触发一次请求）
+    // 启动 weather 后台任务（通过命令触发一次请求）
     ESP_ERROR_CHECK(weather_start_task(12 * 1024, 4));
 
     ESP_ERROR_CHECK(mqtt_app_init(

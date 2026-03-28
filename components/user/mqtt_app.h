@@ -155,6 +155,8 @@ esp_err_t mqtt_app_set_hb_default(bool enable);
  * @return true if default is on; false if default is off.
  */
 bool mqtt_app_get_hb_default(void);
+
+
 esp_err_t mqtt_app_load_subscriptions_from_nvs(void);
 esp_err_t mqtt_app_save_subscriptions_to_nvs(void);
 esp_err_t mqtt_app_clear_subscriptions_nvs(void);

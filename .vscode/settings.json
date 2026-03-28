@@ -5,7 +5,7 @@
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],
-  "idf.port": "/dev/ttyACM0",
+  "idf.port": "/dev/ttyUSB0",
   "idf.toolsPath": "/home/shimu/.espressif",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32s3"

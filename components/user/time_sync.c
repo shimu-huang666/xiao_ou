@@ -1,7 +1,5 @@
 #include "time_sync.h"
 
-#include <uart.h>
-
 #include <stdlib.h>
 
 #include "esp_log.h"
@@ -32,7 +30,7 @@ void print_time_now(void)
 
     char buf[64];
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
-    logi_both(TAG_TIME, "now: %s (UTC+8)", buf);
+    ESP_LOGI(TAG_TIME, "now: %s (UTC+8)", buf);
 }
 
 void time_sync_init(void)

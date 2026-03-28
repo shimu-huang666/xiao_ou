@@ -20,7 +20,6 @@ bool time_is_valid(void);
 
 /**
  * @brief 打印当前时间（按 TZ 配置输出）
- * @note 需要你工程中提供 logi_both(TAG, fmt, ...)
  */
 void print_time_now(void);
 

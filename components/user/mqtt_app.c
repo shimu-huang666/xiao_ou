@@ -14,11 +14,8 @@
 #include "esp_mac.h"
 #include "mqtt_client.h"
 
-#include "uart.h"
 #define MQTT_APP_MAX_SUB_TOPICS 8
 #define MQTT_APP_TOPIC_MAX_LEN 128
-/* -------------------- user log helper (your existing) -------------------- */
-// 你已有 logi_both(...) 就不重复实现了
 
 static const char *TAG_mqtt = "mqtt_app";
 
@@ -316,7 +313,7 @@ int mqtt_app_publish_to(const char *topic, const char *payload, int qos, int ret
     if (!topic || !topic[0] || !payload) return -1;
     if (!mqtt_app_is_connected()) return -1;
 
-    logi_both(TAG_mqtt, "publish topic=%s payload=%s", topic, payload);
+    ESP_LOGI(TAG_mqtt, "publish topic=%s payload=%s", topic, payload);
     return esp_mqtt_client_publish(s_client, topic, payload, 0, qos, retain);
 }
 
@@ -332,12 +329,12 @@ esp_err_t mqtt_app_subscribe_topic(const char *topic, int qos)
 
     if (mqtt_app_is_connected()) {
         int msg_id = esp_mqtt_client_subscribe(s_client, topic, qos);
-        logi_both(TAG_mqtt, "subscribe topic=%s qos=%d msg_id=%d", topic, qos, msg_id);
+        ESP_LOGI(TAG_mqtt, "subscribe topic=%s qos=%d msg_id=%d", topic, qos, msg_id);
         return (msg_id >= 0) ? ESP_OK : ESP_FAIL;
     }
 
     // 未连接也没关系：下次 CONNECTED 时会自动订阅（若 auto 开启）
-    logi_both(TAG_mqtt, "subscribe recorded (offline). topic=%s qos=%d", topic, qos);
+    ESP_LOGI(TAG_mqtt, "subscribe recorded (offline). topic=%s qos=%d", topic, qos);
     return ESP_OK;
 }
 
@@ -351,18 +348,18 @@ esp_err_t mqtt_app_unsubscribe_topic(const char *topic)
 
     if (mqtt_app_is_connected()) {
         int msg_id = esp_mqtt_client_unsubscribe(s_client, topic);
-        logi_both(TAG_mqtt, "unsubscribe topic=%s msg_id=%d", topic, msg_id);
+        ESP_LOGI(TAG_mqtt, "unsubscribe topic=%s msg_id=%d", topic, msg_id);
         return (msg_id >= 0) ? ESP_OK : ESP_FAIL;
     }
 
-    logi_both(TAG_mqtt, "unsubscribe recorded (offline). topic=%s", topic);
+    ESP_LOGI(TAG_mqtt, "unsubscribe recorded (offline). topic=%s", topic);
     return ESP_OK;
 }
 
 void mqtt_app_set_auto_resubscribe(bool enable)
 {
     s_auto_resub = enable;
-    logi_both(TAG_mqtt, "auto_resubscribe=%d", (int)s_auto_resub);
+    ESP_LOGI(TAG_mqtt, "auto_resubscribe=%d", (int)s_auto_resub);
     mqtt_app_save_subscriptions_to_nvs();
 
 }
@@ -377,13 +374,13 @@ void mqtt_app_dump_subscriptions(void)
     subs_lock_init_once();
     xSemaphoreTake(s_subs_lock, portMAX_DELAY);
 
-    logi_both(TAG_mqtt, "==== SUBSCRIPTIONS (auto_resub=%d) ====", (int)s_auto_resub);
+    ESP_LOGI(TAG_mqtt, "==== SUBSCRIPTIONS (auto_resub=%d) ====", (int)s_auto_resub);
     for (int i = 0; i < MQTT_APP_MAX_SUB_TOPICS; i++) {
         if (s_subs[i].used) {
-            logi_both(TAG_mqtt, "[%d] topic=%s qos=%d", i, s_subs[i].topic, s_subs[i].qos);
+            ESP_LOGI(TAG_mqtt, "[%d] topic=%s qos=%d", i, s_subs[i].topic, s_subs[i].qos);
         }
     }
-    logi_both(TAG_mqtt, "======================================");
+    ESP_LOGI(TAG_mqtt, "======================================");
 
     xSemaphoreGive(s_subs_lock);
 }
@@ -440,14 +437,14 @@ static void heartbeat_task(void *arg)
                      "{\"type\":\"hb\",\"uptime_ms\":%" PRId64 "}", up_ms);
 
             int msg_id = mqtt_app_publish_to(s_cfg.hb_topic, payload, s_cfg.hb_qos, s_cfg.hb_retain);
-            logi_both(TAG_mqtt, "HB msg_id=%d payload=%s", msg_id, payload);
+            ESP_LOGI(TAG_mqtt, "HB msg_id=%d payload=%s", msg_id, payload);
         }
 
         uint32_t period = (s_cfg.hb_period_ms ? s_cfg.hb_period_ms : 5000);
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(period));
     }
 
-    logi_both(TAG_mqtt, "HB task exit");
+    ESP_LOGI(TAG_mqtt, "HB task exit");
     s_hb_task = NULL;
     vTaskDelete(NULL);
 }
@@ -466,7 +463,7 @@ static void mqtt_event_handler(void *handler_args,
     switch ((esp_mqtt_event_id_t)event_id) {
 
     case MQTT_EVENT_CONNECTED:
-        logi_both(TAG_mqtt, "MQTT_EVENT_CONNECTED");
+        ESP_LOGI(TAG_mqtt, "MQTT_EVENT_CONNECTED");
         s_connected = true;
 
         // 1) 兼容：如果 cfg 给了 sub_topic，则也加入订阅列表并订阅
@@ -484,15 +481,15 @@ static void mqtt_event_handler(void *handler_args,
         break;
 
     case MQTT_EVENT_SUBSCRIBED:
-        logi_both(TAG_mqtt, "MQTT_EVENT_SUBSCRIBED msg_id=%d", event->msg_id);
+        ESP_LOGI(TAG_mqtt, "MQTT_EVENT_SUBSCRIBED msg_id=%d", event->msg_id);
         break;
 
     case MQTT_EVENT_PUBLISHED:
-        logi_both(TAG_mqtt, "MQTT_EVENT_PUBLISHED msg_id=%d", event->msg_id);
+        ESP_LOGI(TAG_mqtt, "MQTT_EVENT_PUBLISHED msg_id=%d", event->msg_id);
         break;
 
     case MQTT_EVENT_DATA:
-        logi_both(TAG_mqtt, "mqtt event data received: topic=%.*s data=%.*s ",
+        ESP_LOGI(TAG_mqtt, "mqtt event data received: topic=%.*s data=%.*s ",
                  event->topic_len, event->topic, event->data_len, event->data);
         printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
         printf("DATA=%.*s\r\n", event->data_len, event->data);
@@ -562,8 +559,8 @@ void mqtt_app_start(const mqtt_app_cfg_t *cfg)
 
     static char client_id[64];
     make_client_id(client_id, sizeof(client_id));
-    logi_both(TAG_mqtt, "client_id=%s", client_id);
-    logi_both(TAG_mqtt, "broker=%s", s_cfg.broker_uri);
+    ESP_LOGI(TAG_mqtt, "client_id=%s", client_id);
+    ESP_LOGI(TAG_mqtt, "broker=%s", s_cfg.broker_uri);
 
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = s_cfg.broker_uri,
@@ -583,7 +580,7 @@ void mqtt_app_start(const mqtt_app_cfg_t *cfg)
     if (s_cfg.enable_hb) {
         if (s_hb_task == NULL) {
             xTaskCreate(heartbeat_task, "mqtt_hb", 4096, NULL, 5, &s_hb_task);
-            logi_both(TAG_mqtt, "HB task created: %p", s_hb_task);
+            ESP_LOGI(TAG_mqtt, "HB task created: %p", s_hb_task);
         }
     }
 
@@ -600,9 +597,9 @@ void mqtt_app_hb_stop(void)
 
     if (s_hb_task) {
         xTaskNotifyGive(s_hb_task);
-        logi_both(TAG_mqtt, "HB stop requested, task=%p", s_hb_task);
+        ESP_LOGI(TAG_mqtt, "HB stop requested, task=%p", s_hb_task);
     } else {
-        logi_both(TAG_mqtt, "HB already stopped (task NULL)");
+        ESP_LOGI(TAG_mqtt, "HB already stopped (task NULL)");
     }
 }
 
@@ -611,7 +608,7 @@ void mqtt_app_hb_start(void)
     s_cfg.enable_hb = true;
     if (s_hb_task == NULL) {
         xTaskCreate(heartbeat_task, "mqtt_hb", 4096, NULL, 5, &s_hb_task);
-        logi_both(TAG_mqtt, "MQTT heartbeat started");
+        ESP_LOGI(TAG_mqtt, "MQTT heartbeat started");
     }
 }
 

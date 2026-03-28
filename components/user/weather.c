@@ -5,7 +5,6 @@
  */
 
 #include "weather.h"
-#include "uart.h"
 #include "wifi.h"
 
 #include <string.h>
@@ -20,7 +19,6 @@
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"
 
-#include "freertos/task.h"
 #define WEATHER_RECV_BUF_SIZE  2048
 static char s_recv_buf[WEATHER_RECV_BUF_SIZE];
 #define WEATHER_TAG            "weather"
@@ -127,13 +125,14 @@ static esp_err_t http_get_to_buffer(const char *url, char *buf, size_t buf_size,
     esp_http_client_cleanup(client);
     return ESP_OK;
 }
+
 /**
  * @brief 执行一次获取并打印（使用调用者提供缓冲区，供 weather 任务调用）
  */
 static esp_err_t do_fetch_and_print(char *recv_buf, size_t buf_size)
 {
     if (!wifi_is_connected()) {
-        uart_app_write("weather: WiFi not connected\r\n", 30);
+        printf("weather: WiFi not connected\n");
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -144,7 +143,7 @@ static esp_err_t do_fetch_and_print(char *recv_buf, size_t buf_size)
     esp_err_t err = http_get_to_buffer(geo_url, recv_buf, buf_size, &len);
     if (err != ESP_OK) {
         ESP_LOGE(WEATHER_TAG, "geo request failed: %s", esp_err_to_name(err));
-        uart_app_write("weather: geo request failed\r\n", 30);
+        printf("weather: geo request failed\n");
         return err;
     }
 
@@ -153,10 +152,8 @@ static esp_err_t do_fetch_and_print(char *recv_buf, size_t buf_size)
     json_get_string(recv_buf, "status", status, sizeof(status));
     if (strcmp(status, "success") != 0) {
         char msg[64] = {0};
-        char line[128];
         json_get_string(recv_buf, "message", msg, sizeof(msg));
-        snprintf(line, sizeof(line), "weather: geo failed: %s\r\n", msg[0] ? msg : "unknown");
-        uart_app_write(line, strlen(line));
+        printf("weather: geo failed: %s\n", msg[0] ? msg : "unknown");
         return ESP_ERR_INVALID_RESPONSE;
     }
 
@@ -183,7 +180,7 @@ static esp_err_t do_fetch_and_print(char *recv_buf, size_t buf_size)
     err = http_get_to_buffer(meteo_url, recv_buf, buf_size, &len);
     if (err != ESP_OK) {
         ESP_LOGE(WEATHER_TAG, "weather request failed: %s", esp_err_to_name(err));
-        uart_app_write("weather: weather request failed\r\n", 34);
+        printf("weather: weather request failed\n");
         return err;
     }
 
@@ -193,7 +190,7 @@ static esp_err_t do_fetch_and_print(char *recv_buf, size_t buf_size)
 
     /* Open-Meteo 返回的当前数据在 "current" 对象里（避免匹配到 current_units） */
     const char *cur = strstr(recv_buf, "\"current\":{");
-    if (cur) {  
+    if (cur) {
         json_get_double(cur, "temperature_2m", &temp);
         json_get_int(cur, "relative_humidity_2m", &humidity);
         json_get_int(cur, "weather_code", &weather_code);
@@ -201,51 +198,36 @@ static esp_err_t do_fetch_and_print(char *recv_buf, size_t buf_size)
     }
 
     /* 3) Format full address and print */
-    uart_app_write("\r\n--- Location and Weather ---\r\n", strlen("\r\n--- Location and Weather ---\r\n"));
-
-    char line[192];
-    snprintf(line, sizeof(line), "Public IP: %s\r\n", query[0] ? query : "-");
-    uart_app_write(line, strlen(line));
-    snprintf(line, sizeof(line), "Country: %s\r\n", country[0] ? country : "-");
-    uart_app_write(line, strlen(line));
-    snprintf(line, sizeof(line), "Region/State: %s\r\n", region[0] ? region : "-");
-    uart_app_write(line, strlen(line));
-    snprintf(line, sizeof(line), "City: %s\r\n", city[0] ? city : "-");
-    uart_app_write(line, strlen(line));
+    printf("\n--- Location and Weather ---\n");
+    printf("Public IP: %s\n", query[0] ? query : "-");
+    printf("Country: %s\n", country[0] ? country : "-");
+    printf("Region/State: %s\n", region[0] ? region : "-");
+    printf("City: %s\n", city[0] ? city : "-");
     if (district[0]) {
-        snprintf(line, sizeof(line), "District: %s\r\n", district);
-        uart_app_write(line, strlen(line));
+        printf("District: %s\n", district);
     }
     if (zip[0]) {
-        snprintf(line, sizeof(line), "ZIP: %s\r\n", zip);
-        uart_app_write(line, strlen(line));
+        printf("ZIP: %s\n", zip);
     }
-    
-    snprintf(line, sizeof(line),
-    "Lat: %d deg %d'%.2f\"  Lon: %d deg %d'%.2f\"\r\n",
-    (int)lat,
-    (int)((lat - (int)lat) * 60),
-    ((lat - (int)lat) * 60 - (int)((lat - (int)lat) * 60)) * 60,
-    (int)lon,
-    (int)((lon - (int)lon) * 60),
-    ((lon - (int)lon) * 60 - (int)((lon - (int)lon) * 60)) * 60);
 
-    uart_app_write(line, strlen(line));
+    printf("Lat: %d deg %d'%.2f\"  Lon: %d deg %d'%.2f\"\n",
+        (int)lat,
+        (int)((lat - (int)lat) * 60),
+        ((lat - (int)lat) * 60 - (int)((lat - (int)lat) * 60)) * 60,
+        (int)lon,
+        (int)((lon - (int)lon) * 60),
+        ((lon - (int)lon) * 60 - (int)((lon - (int)lon) * 60)) * 60);
+
     if (isp[0]) {
-        snprintf(line, sizeof(line), "ISP: %s\r\n", isp);
-        uart_app_write(line, strlen(line));
+        printf("ISP: %s\n", isp);
     }
 
-    uart_app_write("\r\n--- Current Weather ---\r\n", strlen("\r\n--- Current Weather ---\r\n"));
-    snprintf(line, sizeof(line), "Weather: %s (code %d)\r\n", wmo_weather_desc(weather_code), weather_code);
-    uart_app_write(line, strlen(line));
-    snprintf(line, sizeof(line), "Temperature: %.1f C\r\n", temp);
-    uart_app_write(line, strlen(line));
-    snprintf(line, sizeof(line), "Humidity: %d %%\r\n", humidity);
-    uart_app_write(line, strlen(line));
-    snprintf(line, sizeof(line), "Wind speed: %.1f km/h\r\n", wind_speed);
-    uart_app_write(line, strlen(line));
-    uart_app_write("------------------------\r\n", strlen("------------------------\r\n"));
+    printf("\n--- Current Weather ---\n");
+    printf("Weather: %s (code %d)\n", wmo_weather_desc(weather_code), weather_code);
+    printf("Temperature: %.1f C\n", temp);
+    printf("Humidity: %d %%\n", humidity);
+    printf("Wind speed: %.1f km/h\n", wind_speed);
+    printf("------------------------\n");
 
     return ESP_OK;
 }
