@@ -168,8 +168,15 @@ static esp_err_t do_fetch_and_print(char *recv_buf, size_t buf_size)
     json_get_string(recv_buf, "zip", zip, sizeof(zip));
     json_get_string(recv_buf, "isp", isp, sizeof(isp));
     json_get_string(recv_buf, "query", query, sizeof(query));
-    json_get_double(recv_buf, "lat", &lat);
-    json_get_double(recv_buf, "lon", &lon);
+    if (json_get_double(recv_buf, "lat", &lat) != 0 || json_get_double(recv_buf, "lon", &lon) != 0) {
+        printf("weather: failed to parse latitude/longitude\n");
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+    // 验证经纬度有效性
+    if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
+        printf("weather: invalid coordinates lat=%.4f lon=%.4f\n", lat, lon);
+        return ESP_ERR_INVALID_RESPONSE;
+    }
 
     /* 2) 用经纬度请求 Open-Meteo 当前天气 */
     char meteo_url[256];
@@ -190,11 +197,38 @@ static esp_err_t do_fetch_and_print(char *recv_buf, size_t buf_size)
 
     /* Open-Meteo 返回的当前数据在 "current" 对象里（避免匹配到 current_units） */
     const char *cur = strstr(recv_buf, "\"current\":{");
-    if (cur) {
-        json_get_double(cur, "temperature_2m", &temp);
-        json_get_int(cur, "relative_humidity_2m", &humidity);
-        json_get_int(cur, "weather_code", &weather_code);
-        json_get_double(cur, "wind_speed_10m", &wind_speed);
+    if (!cur) {
+        printf("weather: 'current' object not found in weather response\n");
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    if (json_get_double(cur, "temperature_2m", &temp) != 0) {
+        printf("weather: failed to parse temperature_2m\n");
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+    if (json_get_int(cur, "relative_humidity_2m", &humidity) != 0) {
+        printf("weather: failed to parse relative_humidity_2m\n");
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+    if (json_get_int(cur, "weather_code", &weather_code) != 0) {
+        printf("weather: failed to parse weather_code\n");
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+    if (json_get_double(cur, "wind_speed_10m", &wind_speed) != 0) {
+        printf("weather: failed to parse wind_speed_10m\n");
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    // 合理性检查
+    if (temp < -50.0 || temp > 60.0) {
+        printf("weather: temperature out of reasonable range: %.1f C\n", temp);
+        // 继续显示，但记录警告
+    }
+    if (humidity < 0 || humidity > 100) {
+        printf("weather: humidity out of range: %d %%\n", humidity);
+    }
+    if (wind_speed < 0.0 || wind_speed > 200.0) {
+        printf("weather: wind speed out of reasonable range: %.1f km/h\n", wind_speed);
     }
 
     /* 3) Format full address and print */

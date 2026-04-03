@@ -156,6 +156,20 @@ esp_err_t mqtt_app_set_hb_default(bool enable);
  */
 bool mqtt_app_get_hb_default(void);
 
+/**
+ * @brief Get current heartbeat topic.
+ *
+ * @return heartbeat topic string, or NULL if not set.
+ */
+const char* mqtt_app_get_hb_topic(void);
+
+/**
+ * @brief Set heartbeat topic at runtime.
+ *
+ * @param topic New heartbeat topic (NULL to disable heartbeat)
+ * @return ESP_OK on success; ESP_ERR_INVALID_ARG if topic too long.
+ */
+esp_err_t mqtt_app_set_hb_topic(const char *topic);
 
 esp_err_t mqtt_app_load_subscriptions_from_nvs(void);
 esp_err_t mqtt_app_save_subscriptions_to_nvs(void);

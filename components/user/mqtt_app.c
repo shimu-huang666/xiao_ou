@@ -16,6 +16,7 @@
 
 #define MQTT_APP_MAX_SUB_TOPICS 8
 #define MQTT_APP_TOPIC_MAX_LEN 128
+#define MQTT_APP_HB_TOPIC_MAX_LEN 128
 
 static const char *TAG_mqtt = "mqtt_app";
 
@@ -26,6 +27,9 @@ static bool s_started = false;
 
 static TaskHandle_t s_hb_task = NULL;
 static volatile bool s_hb_running = false;
+
+// 动态心跳 topic 缓冲区
+static char s_hb_topic_buf[MQTT_APP_HB_TOPIC_MAX_LEN] = {0};
 
 static int HEARTBEAT_DEFAULT_OFF = 1;
 
@@ -553,6 +557,15 @@ void mqtt_app_start(const mqtt_app_cfg_t *cfg)
     }
     s_cfg = *cfg;
 
+    // 复制心跳 topic 到动态缓冲区
+    if (cfg->hb_topic && cfg->hb_topic[0]) {
+        strlcpy(s_hb_topic_buf, cfg->hb_topic, sizeof(s_hb_topic_buf));
+        s_cfg.hb_topic = s_hb_topic_buf;
+    } else {
+        s_hb_topic_buf[0] = '\0';
+        s_cfg.hb_topic = NULL;
+    }
+
     subs_lock_init_once();  
     mqtt_app_load_subscriptions_from_nvs();
     mqtt_app_load_hb_default_from_nvs();
@@ -634,4 +647,30 @@ esp_err_t mqtt_app_set_hb_default(bool enable)
 bool mqtt_app_get_hb_default(void)
 {
     return (HEARTBEAT_DEFAULT_OFF == 0);
+}
+
+const char* mqtt_app_get_hb_topic(void)
+{
+    return (s_hb_topic_buf[0] != '\0') ? s_hb_topic_buf : NULL;
+}
+
+esp_err_t mqtt_app_set_hb_topic(const char *topic)
+{
+    if (topic == NULL || topic[0] == '\0') {
+        s_hb_topic_buf[0] = '\0';
+        s_cfg.hb_topic = NULL;
+        ESP_LOGI(TAG_mqtt, "HB topic cleared");
+        return ESP_OK;
+    }
+
+    size_t len = strlen(topic);
+    if (len >= MQTT_APP_HB_TOPIC_MAX_LEN) {
+        ESP_LOGW(TAG_mqtt, "HB topic too long (max %d)", MQTT_APP_HB_TOPIC_MAX_LEN - 1);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    strlcpy(s_hb_topic_buf, topic, sizeof(s_hb_topic_buf));
+    s_cfg.hb_topic = s_hb_topic_buf;
+    ESP_LOGI(TAG_mqtt, "HB topic set to: %s", s_hb_topic_buf);
+    return ESP_OK;
 }

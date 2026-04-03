@@ -139,6 +139,8 @@ void print_help(void)
         "  pub <topic> <payload...>  - [qos] [retain]\r\n"
         "  hb on|off                 - heartbeat on/off\r\n"
         "  hb?                       - show heartbeat status\r\n"
+        "  hb topic                  - show heartbeat topic\r\n"
+        "  hb topic <topic>          - set heartbeat topic\r\n"
         "  hb def on|off             - set default heartbeat (NVS)\r\n"
         "  hb def?                   - show default heartbeat setting\r\n"
         "\r\n"
@@ -237,7 +239,7 @@ static bool handle_mqtt_cmd(char *line_mutable)
     if (strcmp(cmd, "hb") == 0) {
         char *arg1 = next_token(&p);
         if (!arg1) {
-            uart_printf("Usage: hb on|off | hb def on|off | hb def?\r\n");
+            uart_printf("Usage: hb on|off | hb topic [topic] | hb def on|off | hb def?\r\n");
             return true;
         }
 
@@ -270,6 +272,24 @@ static bool handle_mqtt_cmd(char *line_mutable)
             return true;
         }
 
+        if (strcmp(arg1, "topic") == 0) {
+            char *new_topic = next_token(&p);
+            if (!new_topic) {
+                // 查询当前 topic
+                const char *cur = mqtt_app_get_hb_topic();
+                if (cur && cur[0]) {
+                    uart_printf("hb topic: %s\r\n", cur);
+                } else {
+                    uart_printf("hb topic: (not set)\r\n");
+                }
+                return true;
+            }
+            // 设置新 topic
+            esp_err_t err = mqtt_app_set_hb_topic(new_topic);
+            uart_printf("hb topic set -> %s (%s)\r\n", new_topic, esp_err_to_name(err));
+            return true;
+        }
+
         if (strcmp(arg1, "def?") == 0) {
             uart_printf("hb default is %s\r\n", mqtt_app_get_hb_default() ? "on" : "off");
             return true;
@@ -280,7 +300,9 @@ static bool handle_mqtt_cmd(char *line_mutable)
     }
 
     if (strcmp(cmd, "hb?") == 0) {
+        const char *topic = mqtt_app_get_hb_topic();
         uart_printf("hb is %s\r\n", mqtt_app_is_hb_enabled() ? "on" : "off");
+        uart_printf("hb topic: %s\r\n", (topic && topic[0]) ? topic : "(not set)");
         return true;
     }
 

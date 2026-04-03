@@ -245,8 +245,10 @@ static int do_hb(int argc, char **argv)
     // hb? - 查询当前状态
     if (hb_args.mode->count == 0 ||
         strcmp(hb_args.mode->sval[0], "?") == 0) {
+        const char *topic = mqtt_app_get_hb_topic();
         printf("hb is %s\n", mqtt_app_is_hb_enabled() ? "on" : "off");
-        printf("Usage: hb on|off | hb def on|off | hb def?\n");
+        printf("hb topic: %s\n", (topic && topic[0]) ? topic : "(not set)");
+        printf("Usage: hb on|off | hb topic [topic] | hb def on|off | hb def?\n");
         return 0;
     }
 
@@ -262,6 +264,25 @@ static int do_hb(int argc, char **argv)
         mqtt_app_hb_stop();
         printf("hb -> off\n");
         return 0;
+    }
+
+    // hb topic [new_topic]
+    if (strcmp(m, "topic") == 0) {
+        if (hb_args.subcmd->count == 0) {
+            // 查询当前 topic
+            const char *cur = mqtt_app_get_hb_topic();
+            if (cur && cur[0]) {
+                printf("hb topic: %s\n", cur);
+            } else {
+                printf("hb topic: (not set)\n");
+            }
+            return 0;
+        }
+        // 设置新 topic
+        const char *new_topic = hb_args.subcmd->sval[0];
+        esp_err_t err = mqtt_app_set_hb_topic(new_topic);
+        printf("hb topic set -> %s (%s)\n", new_topic, esp_err_to_name(err));
+        return (err == ESP_OK) ? 0 : 1;
     }
 
     // hb def on/off | hb def?
@@ -289,20 +310,20 @@ static int do_hb(int argc, char **argv)
         return 1;
     }
 
-    printf("Usage: hb on|off | hb def on|off | hb def?\n");
+    printf("Usage: hb on|off | hb topic [topic] | hb def on|off | hb def?\n");
     return 1;
 }
 
 static void register_hb(void)
 {
-    hb_args.mode = arg_str0(NULL, NULL, "<on|off|def>", "Heartbeat mode");
-    hb_args.subcmd = arg_str0(NULL, NULL, "<on|off|?>", "Sub-command for 'def'");
+    hb_args.mode = arg_str0(NULL, NULL, "<on|off|def|topic>", "Heartbeat mode");
+    hb_args.subcmd = arg_str0(NULL, NULL, "<on|off|topic|?>", "Sub-command");
     hb_args.end = arg_end(2);
 
     const esp_console_cmd_t cmd = {
         .command = "hb",
         .help = "MQTT heartbeat control",
-        .hint = "[on|off|def on|off|def?]",
+        .hint = "[on|off|topic [topic]|def on|off|def?]",
         .func = &do_hb,
         .argtable = &hb_args,
     };

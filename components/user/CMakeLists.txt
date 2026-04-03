@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS "lvgl_api.c"
          "wifi_service.c"
+         "uart.c"
          "mqtt_app.c"
          "time_sync.c"
          "wifi.c"

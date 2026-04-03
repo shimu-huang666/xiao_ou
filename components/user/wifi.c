@@ -40,11 +40,12 @@ static const char *TAG_SCAN = "scan";
 /* -------------------------- Context -------------------------- */
 
 typedef struct {
-    EventGroupHandle_t ev;
+    EventGroupHandle_t wifi_event_group;
     bool inited;
     bool connected;          // got IP
     bool manual_disconnect;
     int  retry_num;
+    int  last_disconnect_reason;  // 存储最近一次WiFi断开原因
 
     esp_netif_t *sta_netif;
 
@@ -294,13 +295,14 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
         s.connected = false;
 
         wifi_event_sta_disconnected_t *dis = (wifi_event_sta_disconnected_t *)data;
-        ESP_LOGI(TAG_WIFI, "DISCONNECTED, reason=%d", dis ? dis->reason : -1);
+        s.last_disconnect_reason = dis ? dis->reason : -1;
+        ESP_LOGI(TAG_WIFI, "DISCONNECTED, reason=%d", s.last_disconnect_reason);
 
         if (s.manual_disconnect) {
             ESP_LOGI(TAG_WIFI, "Manual disconnect -> skip auto reconnect");
             s.retry_num = 0;
-            xEventGroupClearBits(s.ev, WIFI_CONNECTED_BIT);
-            xEventGroupSetBits(s.ev, WIFI_FAIL_BIT);
+            xEventGroupClearBits(s.wifi_event_group, WIFI_CONNECTED_BIT);
+            xEventGroupSetBits(s.wifi_event_group, WIFI_FAIL_BIT);
             return;
         }
 
@@ -309,7 +311,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
             ESP_LOGI(TAG_WIFI, "retry %d/%d", s.retry_num, WIFI_MAXIMUM_RETRY);
             esp_wifi_connect();
         } else {
-            xEventGroupSetBits(s.ev, WIFI_FAIL_BIT);
+            xEventGroupSetBits(s.wifi_event_group, WIFI_FAIL_BIT);
         }
         return;
     }
@@ -319,7 +321,8 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) data;
         ESP_LOGI(TAG_WIFI, "GOT_IP: " IPSTR, IP2STR(&event->ip_info.ip));
         s.retry_num = 0;
-        xEventGroupSetBits(s.ev, WIFI_CONNECTED_BIT);
+        s.last_disconnect_reason = 0;  // 清除上次断开原因
+        xEventGroupSetBits(s.wifi_event_group, WIFI_CONNECTED_BIT);
         return;
     }
 }
@@ -330,8 +333,8 @@ esp_err_t wifi_init_once(void)
 {
     if (s.inited) return ESP_OK;
 
-    s.ev = xEventGroupCreate();
-    if (!s.ev) return ESP_ERR_NO_MEM;
+    s.wifi_event_group = xEventGroupCreate();
+    if (!s.wifi_event_group) return ESP_ERR_NO_MEM;
 
     ESP_ERROR_CHECK(esp_netif_init());
 
@@ -469,8 +472,9 @@ esp_err_t wifi_connect_by_index(int idx_1based, const char *psw_opt)
     wifi_config.sta.bssid_set = 1;
     memcpy(wifi_config.sta.bssid, ap->bssid, 6);
 
-    xEventGroupClearBits(s.ev, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
+    xEventGroupClearBits(s.wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
     s.retry_num = 0;
+    s.last_disconnect_reason = 0;  // 清除上次断开原因
 
     ESP_LOGI(TAG_WIFI, "Target AP: ssid='%s' bssid=%02x:%02x:%02x:%02x:%02x:%02x ch=%d rssi=%d auth=%s",
               (char *)ap->ssid,
@@ -485,7 +489,7 @@ esp_err_t wifi_connect_by_index(int idx_1based, const char *psw_opt)
     ESP_ERROR_CHECK(esp_wifi_connect());
 
     EventBits_t bits = xEventGroupWaitBits(
-        s.ev, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+        s.wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
         pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONNECT_TIMEOUT_MS));
 
     if (bits & WIFI_CONNECTED_BIT) {
@@ -583,7 +587,7 @@ esp_err_t wifi_auto_connect_last(void)
     /* ========== 第5步：准备事件同步 ==========
      * 清除之前的事件位，重置重试计数器
      */
-    xEventGroupClearBits(s.ev, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
+    xEventGroupClearBits(s.wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
     s.retry_num = 0;
 
     ESP_LOGI(TAG_WIFI, "Auto connect (saved cfg): ssid='%s' bssid_set=%d",
@@ -610,7 +614,7 @@ esp_err_t wifi_auto_connect_last(void)
      *   - 参数5: 超时时间（ticks）
      */
     EventBits_t bits = xEventGroupWaitBits(
-        s.ev, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+        s.wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
         pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONNECT_TIMEOUT_MS));
 
     /* ========== 第8步：处理连接结果 ========== */
@@ -697,8 +701,9 @@ esp_err_t wifi_connect_by_ssid(const char *ssid, const char *psw)
     // 如果你想支持 open（空密码）：
     // if (psw[0] == '\0') wifi_config.sta.threshold.authmode = WIFI_AUTH_OPEN;
 
-    xEventGroupClearBits(s.ev, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
+    xEventGroupClearBits(s.wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
     s.retry_num = 0;
+    s.last_disconnect_reason = 0;  // 清除上次断开原因
 
     ESP_LOGI(TAG_WIFI, "Connect by SSID: '%s'", ssid);
 
@@ -710,7 +715,7 @@ esp_err_t wifi_connect_by_ssid(const char *ssid, const char *psw)
     ESP_ERROR_CHECK(esp_wifi_connect());
 
     EventBits_t bits = xEventGroupWaitBits(
-        s.ev, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+        s.wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
         pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONNECT_TIMEOUT_MS));
 
     if (bits & WIFI_CONNECTED_BIT) {
@@ -759,8 +764,9 @@ esp_err_t wifi_reconnect_saved(void)
     // 可选：如果你不想锁 BSSID，避免 AP 漫游/更换导致连不上，可以强制清掉：
     // cfg.sta.bssid_set = 0;
 
-    xEventGroupClearBits(s.ev, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
+    xEventGroupClearBits(s.wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
     s.retry_num = 0;
+    s.last_disconnect_reason = 0;  // 清除上次断开原因
 
     ESP_LOGI(TAG_WIFI, "Reconnecting using saved STA cfg: ssid='%s'%s",
               (char*)cfg.sta.ssid,
@@ -774,7 +780,7 @@ esp_err_t wifi_reconnect_saved(void)
     ESP_ERROR_CHECK(esp_wifi_connect());
 
     EventBits_t bits = xEventGroupWaitBits(
-        s.ev, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+        s.wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
         pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONNECT_TIMEOUT_MS));
 
     if (bits & WIFI_CONNECTED_BIT) {
@@ -841,3 +847,80 @@ esp_err_t wifi_start_bg_scan_task(const char *task_name, uint32_t stack_words, U
            ? ESP_OK : ESP_FAIL;
 }
 
+int wifi_get_last_disconnect_reason(void)
+{
+    return s.last_disconnect_reason;
+}
+
+const char* wifi_disconnect_reason_to_str(int reason)
+{
+    switch (reason) {
+    case 0:
+        return "No error";
+    case WIFI_REASON_UNSPECIFIED:
+        return "Unspecified error";
+    case WIFI_REASON_AUTH_EXPIRE:
+        return "Authentication expired";
+    case WIFI_REASON_AUTH_LEAVE:
+        return "Authentication leave";
+    case WIFI_REASON_ASSOC_EXPIRE:
+        return "Association expired";
+    case WIFI_REASON_ASSOC_TOOMANY:
+        return "Too many associations";
+    case WIFI_REASON_NOT_AUTHED:
+        return "Not authenticated";
+    case WIFI_REASON_NOT_ASSOCED:
+        return "Not associated";
+    case WIFI_REASON_ASSOC_LEAVE:
+        return "Association leave";
+    case WIFI_REASON_ASSOC_NOT_AUTHED:
+        return "Association not authenticated";
+    case WIFI_REASON_DISASSOC_PWRCAP_BAD:
+        return "Disassociate due to power cap bad";
+    case WIFI_REASON_DISASSOC_SUPCHAN_BAD:
+        return "Disassociate due to SUP channel bad";
+    case WIFI_REASON_IE_INVALID:
+        return "Invalid IE";
+    case WIFI_REASON_MIC_FAILURE:
+        return "MIC failure";
+    case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+        return "4-way handshake timeout (可能密码错误)";
+    case WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT:
+        return "Group key update timeout";
+    case WIFI_REASON_IE_IN_4WAY_DIFFERS:
+        return "IE in 4-way differs";
+    case WIFI_REASON_GROUP_CIPHER_INVALID:
+        return "Group cipher invalid";
+    case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
+        return "Pairwise cipher invalid";
+    case WIFI_REASON_AKMP_INVALID:
+        return "AKMP invalid";
+    case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
+        return "Unsupported RSN IE version";
+    case WIFI_REASON_INVALID_RSN_IE_CAP:
+        return "Invalid RSN IE capabilities";
+    case WIFI_REASON_802_1X_AUTH_FAILED:
+        return "802.1X authentication failed";
+    case WIFI_REASON_CIPHER_SUITE_REJECTED:
+        return "Cipher suite rejected";
+    case WIFI_REASON_BEACON_TIMEOUT:
+        return "Beacon timeout";
+    case WIFI_REASON_NO_AP_FOUND:
+        return "No AP found";
+    case WIFI_REASON_AUTH_FAIL:
+        return "Authentication failed";
+    case WIFI_REASON_ASSOC_FAIL:
+        return "Association failed";
+    case WIFI_REASON_HANDSHAKE_TIMEOUT:
+        return "Handshake timeout";
+    default:
+        if (reason < 0) return "Invalid reason code";
+        return "Unknown reason";
+    }
+}
+
+void wifi_disconnect_manual(void)
+{
+    s.manual_disconnect = true;
+    esp_wifi_disconnect();
+}

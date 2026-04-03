@@ -87,9 +87,27 @@ void wifi_print_info(void);
 esp_err_t wifi_reconnect_saved(void);
 
 /**
+ * @brief 获取最后一次WiFi断开原因代码
+ * @return 断开原因代码，0表示无断开记录
+ */
+int wifi_get_last_disconnect_reason(void);
+
+/**
+ * @brief 将WiFi断开原因代码转换为可读字符串
+ * @param reason 断开原因代码
+ * @return 描述字符串
+ */
+const char* wifi_disconnect_reason_to_str(int reason);
+
+/**
  * @brief 是否已连接 WiFi 并获取到 IP
  */
 bool wifi_is_connected(void);
+
+/**
+ * @brief 手动断开WiFi连接（设置手动断开标志，防止自动重连）
+ */
+void wifi_disconnect_manual(void);
 
 #ifdef __cplusplus
 }

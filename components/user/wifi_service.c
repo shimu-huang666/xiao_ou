@@ -8,6 +8,7 @@
 #include "esp_wifi.h"
 
 #include "wifi.h"
+#include "uart.h"   // uart_app_write
 
 static const char *TAG = "wifi_svc";
 
@@ -66,11 +67,39 @@ static void wifi_service_task(void *arg)
             s_busy = true;
 
             ESP_LOGI("wifi", "Connect request: index=%d", r.u.conn_index.index);
+            uart_app_write("\r\n", 2);
+            uart_app_write("Connecting to AP #", 18);
+            char idx_str[16];
+            snprintf(idx_str, sizeof(idx_str), "%d", r.u.conn_index.index);
+            uart_app_write(idx_str, strlen(idx_str));
+            uart_app_write("...\r\n", 5);
+
             esp_err_t e = wifi_connect_by_index(
                 r.u.conn_index.index,
                 r.u.conn_index.has_psw ? r.u.conn_index.psw : NULL
             );
             ESP_LOGI("wifi", "Connect result: %s", esp_err_to_name(e));
+
+            if (e == ESP_OK) {
+                uart_app_write("Connection successful\r\n", 23);
+            } else {
+                int reason = wifi_get_last_disconnect_reason();
+                const char *reason_str = wifi_disconnect_reason_to_str(reason);
+                uart_app_write("Connection failed: ", 19);
+                uart_app_write(esp_err_to_name(e), strlen(esp_err_to_name(e)));
+                uart_app_write("\r\n", 2);
+                if (reason != 0) {
+                    uart_app_write("Reason: ", 8);
+                    uart_app_write(reason_str, strlen(reason_str));
+                    uart_app_write("\r\n", 2);
+                }
+                // 特别提示密码错误
+                if (reason == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT ||
+                    reason == WIFI_REASON_AUTH_FAIL ||
+                    reason == WIFI_REASON_NOT_AUTHED) {
+                    uart_app_write("Hint: Password may be incorrect\r\n", 34);
+                }
+            }
 
             s_busy = false;
             break;
@@ -80,19 +109,46 @@ static void wifi_service_task(void *arg)
             s_busy = true;
 
             ESP_LOGI("wifi", "Connect request: ssid='%s'", r.u.conn_ssid.ssid);
+            uart_app_write("\r\n", 2);
+            uart_app_write("Connecting to SSID: ", 20);
+            uart_app_write(r.u.conn_ssid.ssid, strlen(r.u.conn_ssid.ssid));
+            uart_app_write("...\r\n", 5);
+
             esp_err_t e = wifi_connect_by_ssid(r.u.conn_ssid.ssid, r.u.conn_ssid.psw);
             ESP_LOGI("wifi", "Connect result: %s", esp_err_to_name(e));
+
+            if (e == ESP_OK) {
+                uart_app_write("Connection successful\r\n", 23);
+            } else {
+                int reason = wifi_get_last_disconnect_reason();
+                const char *reason_str = wifi_disconnect_reason_to_str(reason);
+                uart_app_write("Connection failed: ", 19);
+                uart_app_write(esp_err_to_name(e), strlen(esp_err_to_name(e)));
+                uart_app_write("\r\n", 2);
+                if (reason != 0) {
+                    uart_app_write("Reason: ", 8);
+                    uart_app_write(reason_str, strlen(reason_str));
+                    uart_app_write("\r\n", 2);
+                }
+                // 特别提示密码错误
+                if (reason == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT ||
+                    reason == WIFI_REASON_AUTH_FAIL ||
+                    reason == WIFI_REASON_NOT_AUTHED) {
+                    uart_app_write("Hint: Password may be incorrect\r\n", 34);
+                }
+            }
 
             s_busy = false;
             break;
         }
 
         case WIFI_REQ_DISCONN: {
-            // 手动断开：不要在 cmd.c 里直接改 wifi_ctx_t
-            // 这里最保守、最通用的做法：直接调用 esp_wifi_disconnect()
-            // 如果你在 wifi.c 里做了 wifi_disconnect_manual()，这里换成那个更好
+            // 手动断开：使用wifi_disconnect_manual设置手动断开标志
             ESP_LOGI("wifi", "Manual disconnect requested");
-            esp_wifi_disconnect();
+            uart_app_write("\r\n", 2);
+            uart_app_write("Manual disconnect requested\r\n", 28);
+            wifi_disconnect_manual();
+            uart_app_write("Disconnected. Auto-reconnect disabled.\r\n", 41);
             s_busy = false;
             break;
         }
