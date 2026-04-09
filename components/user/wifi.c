@@ -803,28 +803,6 @@ uint16_t wifi_get_scan_cache_count(void)
     return s.ap_cache_num;
 }
 
-/* -------------------------- CLI task -------------------------- */
-
-static void print_help(void)
-{
-    const char *h =
-        "scan                   - wifi scan\r\n"
-        "conn <i> [psw]         - connect to AP by index\r\n"
-        "connssid <ssid> <psw>  - connect by ssid and password\r\n"
-        "info                   - show current wifi info\r\n"
-        "time                   - show time\r\n"
-        "disconn                - manual disconnect (no auto-reconnect)\r\n"
-        "reconn                 - reconnect using saved STA cfg (flash)\r\n"
-        "forget                 - erase last saved wifi (NVS) and disconnect\r\n"
-        "mem                    - show saved wifi memory (NVS + STA flash cfg)\r\n"
-        "mqttsend <message>     - mqtt send message\r\n"
-        "help                   - show help\r\n"
-
-        ;
-    uart_app_write(h, strlen(h));
-}
-
-
 /* -------------------------- bg task -------------------------- */
 
 static void wifi_bg_task(void *arg)

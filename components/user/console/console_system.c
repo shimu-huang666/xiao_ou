@@ -120,6 +120,7 @@ static int do_tasks(int argc, char **argv)
     (void)argc;
     (void)argv;
 
+#if CONFIG_FREERTOS_USE_TRACE_FACILITY
     // 获取任务数量
     UBaseType_t task_num = uxTaskGetNumberOfTasks();
     if (task_num == 0) {
@@ -160,6 +161,11 @@ static int do_tasks(int argc, char **argv)
 
     free(task_array);
     return 0;
+#else
+    printf("tasks command requires CONFIG_FREERTOS_USE_TRACE_FACILITY=y\n");
+    printf("Current task count: %u\n", (unsigned int)uxTaskGetNumberOfTasks());
+    return 0;
+#endif
 }
 
 static void register_tasks(void)

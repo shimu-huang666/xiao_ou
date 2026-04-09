@@ -1,12 +1,13 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
-  "idf.espIdfPath": "/home/shimu/esp/v5.5.3/esp-idf",
-  "idf.pythonInstallPath": "/usr/bin/python3",
+  "idf.espIdfPath": "/home/shimu/esp/v5.5.4/esp-idf",
+  "idf.pythonInstallPath": "/tmp/esp-idf-py310/bin/python",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],
   "idf.port": "/dev/ttyUSB0",
   "idf.toolsPath": "/home/shimu/.espressif",
+  "idf.buildPath": "/home/shimu/xiao_ou/build",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32s3"
   },
@@ -14,9 +15,9 @@
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=/home/shimu/ESP/WiFi/build"
+    "--compile-commands-dir=/home/shimu/xiao_ou/build"
   ],
   "idf.flashType": "UART",
-  "idf.currentSetup": "/home/shimu/.espressif/v5.5.3/esp-idf",
+  "idf.currentSetup": "/home/shimu/esp/v5.5.4/esp-idf",
   "deepseek.apiKey": "sk-5a6804b9948b420babd5566dd53a0705"
 }

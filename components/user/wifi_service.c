@@ -25,7 +25,7 @@ static void scan_worker_task(void *arg)
     (void)arg;
 
     ESP_LOGI("scan", "Scan worker started...");
-    wifi_scan_once_and_print_by_rssi();
+    wifi_scan_once_and_print_sorted();
     ESP_LOGI("scan", "Scan worker done.");
 
     s_busy = false;
