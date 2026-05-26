@@ -122,3 +122,10 @@ Desktop.ini
 
 # VSCode sensitive settings
 .vscode/settings.json
+
+# Claude Code project settings
+.claude/settings.json
+
+# Empty / placeholder
+.codex
+esp-sr/
